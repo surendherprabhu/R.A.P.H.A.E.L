@@ -1,4 +1,5 @@
 {
     "editor.inlineSuggest.edits.allowCodeShifting": "never",
-    "editor.inlineSuggest.edits.renderSideBySide": "never"
+    "editor.inlineSuggest.edits.renderSideBySide": "never",
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }
