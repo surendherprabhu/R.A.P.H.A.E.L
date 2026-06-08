@@ -5,30 +5,23 @@ import customtkinter as ctk
 
 
 import ollama
-
+from Data import Global_Variables
 import sys
 import os
 import threading
 import json
 
-
-model = "Raphael"
-chat_limit = 64
-json_path = "./Data"
-application_name = "R.A.P.H.A.E.L"
-connection_status = "Connected 🌐"
+import subprocess
+import time
+import platform
+import requests
 
 
-GUI_colors = {
-        
-        "background" : "",
-        "panel" : "",
-        "input" : "",
-        "dim" : "",
-        "text" : "",
-        "accent" : ""
+#Global Variables
+model = Global_Variables["model"]
+json_path = Global_Variables["json_path"]
+application_name = Global_Variables["application_name"]
 
-}
 
 Conversation = [
 
@@ -37,54 +30,64 @@ Conversation = [
         "content" : "Remember Raphael, You WILL do what are told to do and TELL what you are asked"
     }
 ]
+connection_status = "Offline 💤"
 
-def start_ollama():
-    os.system("ollama serve")
-
-def Start_Chat(Convo = Conversation):
-    response = ollama.chat(
-        model = model,
-        messages=Convo
-    )
-    for chat in range(chat_limit):
-        
-        user_input = str(input("You: "))
-        print("\n")
-        
-        if "goodbye" in user_input.lower():
-            break
-        
-
-        user_message = {
-            "role" : "user",
-            "content" : f"{user_input}"
-        }
-
-        Convo.append(user_message)
-
-        response = ollama.chat(
-            model = model,
-            messages=Convo
-        )
-        
-        if "code1" in user_input.lower():
-            os.system(f"{response["message"]["content"]}")
-            continue
-
-        assistant_message = {
-            "role" : "assistant",
-            "content" : f"{response["message"]["content"]}"
-        }
-
-        Convo.append(assistant_message)
-
-        print(f"Raphael : {response["message"]["content"]}")
-        print("\n")
-
-
-
-    SaveAsJson(Convo)
+def start_ollama_background():
+    system_os = platform.system()
     
+    try:
+        response = requests.get("http://localhost:11434")
+        if response.status_code == 200:
+            print("Ollama is already running.")
+            return True
+    except requests.exceptions.ConnectionError:
+        pass
+
+    print(f"Starting Ollama on {system_os} in the background...")
+
+    try:
+        if system_os == "Windows":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0  
+            
+            subprocess.Popen(
+                ["ollama", "serve"], 
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+        elif system_os in ["Darwin", "Linux"]: # macOS or Linux
+            subprocess.Popen(
+                ["ollama", "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                preexec_fn=os.setsid  
+            )
+            
+        else:
+            print(f"Unsupported Operating System: {system_os}")
+            return False
+
+        for attempt in range(10):
+            try:
+                # Ping Ollama local port
+                res = requests.get("http://localhost:11434")
+                if res.status_code == 200:
+                    print("Ollama successfully started in the background!")
+                    return True
+            except requests.exceptions.ConnectionError:
+                time.sleep(1) 
+                
+        print("Timeout: Ollama process launched but failed to respond.")
+        return False
+
+    except FileNotFoundError:
+        print("Error: Ollama CLI is not installed or not added to your system PATH.")
+        return False
+
 def SaveAsJson(Conversation):
     try:
         os.mkdir("Data")
@@ -99,31 +102,19 @@ def ListFiles(Folder_path = json_path):
     files = os.listdir(Folder_path)
     for index , file in enumerate(files):
         new_file = file.removesuffix(".json")
-        print(f"{index}. {new_file}")
+
     return files
 
-def Terminal_access():
-    print("1.Open rapahel \n2.list data files \n3.Continue Conversation \n\n")
-    user_choice = str(input(">>"))
-
-
-    if user_choice.lower() in "1.Open rapahel".lower():
-        Start_Chat()
-    elif user_choice.lower() in "2.list data files":
-        ListFiles()
-    elif user_choice.lower() in "3.continue conversation":
-        ListFiles()
-        file_name = str(input("Enter the Name of the conversation that you wish to continue:\n>> "))
-        with open(f"Data/{file_name}.json") as file:
-            data = json.load(file)
-        Start_Chat(data)
 
 class Raphael:
     def __init__(self):
         self.conversation = Conversation.copy()
+        self.connection_status = connection_status
 
-        self.create_window()
-        self.root.mainloop()
+        if start_ollama_background():
+            self.connection_status = "Online 🌐"
+            self.create_window()
+            self.root.mainloop()
 
     def create_window(self):
         self.root = ctk.CTk(
@@ -160,7 +151,7 @@ class Raphael:
         ctk.CTkLabel(self.root,text=application_name).place(relx = 0.1,rely =0.04,anchor = "center",relwidth = 0.15,relheight=0.1)
          
         #Connection Status
-        ctk.CTkLabel(self.root, text=connection_status).place(relx = 0.90,rely =0.04,anchor="center",)
+        ctk.CTkLabel(self.root, text=self.connection_status).place(relx = 0.90,rely =0.04,anchor="center",)
 
         #settings button
         ctk.CTkButton(self.root, text="Settings").place(relx=0.1,rely=0.95,anchor="center",relwidth = 0.14,)
@@ -189,7 +180,15 @@ class Raphael:
         self.send_button.place(relx = 0.925 , rely = 0.83 , anchor ="center" ,relheight = 0.085 , relwidth = 0.085)
         
     def chat_select(self,selected_chat):
-         return(selected_chat)
+        with open(f"Data/{selected_chat}") as file:
+            data = json.load(file)
+            self.save_chat()
+            self.chat_box.configure(state="normal")
+            self.chat_box.delete("1.0", "end")
+            self.chat_box.configure(state="disabled")
+
+            self.conversation = []
+            self.conversation = data   
   
     def add_message(self, content, role):
         self.chat_box.configure(state="normal")
@@ -258,7 +257,46 @@ class Raphael:
         self.chat_box.configure(state="disabled")
     
     def save_chat(self):
-        
-        
+        try:
+            os.mkdir("Data")
+        except:
+            pass
+        convo_copy = self.conversation.copy()
+        convo_copy.append({
+            "role" : "user",
+            "content": "summarize this convo in 3 words and dont say anything else"
+        })
 
-Raphael()
+        filename_total = ollama.chat(
+            model = model,
+            messages = convo_copy
+        )
+        filename = filename_total["message"]["content"]
+        file = f"{filename}.json"
+        with open(f"Data/{filename}" , "w") as f:
+            json.dump(self.conversation, f)
+        self.add_memories()
+
+    def add_memories(self):
+        with open("Memories/Memories.json") as file:
+            data = json.load(file)
+
+        temp = self.conversation.copy()
+        temp.append({
+            "role" : "system",
+            "content" : f"Hello Raphael. These are your memories '{data}',Now return me a summarize this along with the conversation that you just had. Think of it like appending it to your memories, and do not forget anything."
+        })
+        reply = ollama.chat(
+            model = model,
+            messages=temp
+        )
+        memory = reply["message"]["content"]
+        with open("Memories/Memories.json", "w") as file:
+            pass 
+        with open("Memories/Memories.json", "w") as file:
+            json.dump([memory] , file)
+
+
+# Initialization
+if __name__ == "__main__":
+    Raphael()
