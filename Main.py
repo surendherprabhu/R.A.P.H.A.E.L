@@ -10,11 +10,12 @@ import sys
 import os
 import threading
 import json
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 import subprocess
 import time
 import platform
 import requests
+
 
 
 #Global Variables
@@ -27,7 +28,10 @@ Conversation = [
 
     {
         "role" : "system",
-        "content" : "Remember Raphael, You WILL do what are told to do and TELL what you are asked"
+        "content" : """Remember Raphael, You WILL do what are told to do and TELL what you are asked.
+                        During Web searchs Do not clutter the screen by providing links unless asked to.
+                    """
+
     }
 ]
 connection_status = "Offline 💤"
@@ -116,17 +120,31 @@ def get_time():
     return datetime.now().strftime(
         "%H:%M:%S"
     )
+def get_date():
+    from datetime import datetime
 
+    return datetime.now().strftime(
+        "%m/%d/%Y"
+    )
 def search_web(query):
 
     with DDGS() as ddgs:
+        print(f"Searching the Web for '{query}'")
         results = list(ddgs.text(query,max_results=5))
     return results
-
+def get_battery():
+    result = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True)
+    match = re.search(r"(\d+)%", result.stdout)
+    if match:
+        return f"{match.group(1)}%"
+    return "Battery Percentage not found"
 TOOLS = {
 
     "get_time": get_time,
-    "search_web": search_web
+    "search_web": search_web,
+    "get_date": get_date,
+    "get_battery": get_battery
+
 
 
 }
@@ -167,6 +185,8 @@ class Raphael:
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
 
+
+
         full_screen_width = self.root.winfo_screenwidth()
         full_screen_height = self.root.winfo_screenheight()
 
@@ -184,7 +204,7 @@ class Raphael:
         self.root.configure(bg = "#050d1e")
         
         #seperators
-        ttk.Separator(self.root, orient="vertical").place(relx=0.2, rely=0.09, relheight=0.81, relwidth=0.001)
+        ttk.Separator(self.root, orient="vertical").place(x=0.2, rely=0.09, relheight=0.81, relwidth=0.001)
         ttk.Separator(self.root, orient="horizontal").place(relx=0, rely=0.09, relheight=0.001, relwidth=1)
         ttk.Separator(self.root, orient="horizontal").place(relx=0, rely=0.9, relheight=0.001, relwidth=1)
 
@@ -219,6 +239,9 @@ class Raphael:
         #send button
         self.send_button = ctk.CTkButton(self.root, text = "Send",command = self.program_cycle)
         self.send_button.place(relx = 0.925 , rely = 0.83 , anchor ="center" ,relheight = 0.085 , relwidth = 0.085)
+
+        self.root.wm_attributes("-transparent" , True)
+
         
     def chat_select(self,selected_chat):
         with open(f"Data/{selected_chat}.json") as file:
@@ -247,7 +270,7 @@ class Raphael:
         "type": "function",
         "function": {
             "name": "get_time",
-            "description": "Returns the current time",
+            "description": "Returns the current date in month/date/year foramt. Use this whenever the users asks for the current date,month or year",
             "parameters": {
                 "type": "object",
                 "properties": {}
@@ -269,7 +292,29 @@ class Raphael:
             "required": ["query"]
         }
     }
-}
+},
+  {
+        "type": "function",
+        "function": {
+            "name": "get_date",
+            "description": "Returns the current date",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+                            }
+                    }
+                     },
+                     {
+        "type": "function",
+        "function": {
+            "name": "get_battery",
+            "description": "Returns the current battery percentage of the Mac",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+                            }
+                    }
+                     }
                 ]
 
         self.response = ollama.chat(
@@ -404,6 +449,7 @@ class Raphael:
             model = model,
             messages=temp
         )
+
         memory = reply["message"]["content"]
         with open("Memories/Memories.json", "w") as file:
             json.dump(memory , file , indent=4)
