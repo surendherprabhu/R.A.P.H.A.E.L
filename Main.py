@@ -2,15 +2,15 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 import customtkinter as ctk
-
-
+import copy
+import re
 import ollama
 from Data import Global_Variables
 import sys
 import os
 import threading
 import json
-
+from duckduckgo_search import DDGS
 import subprocess
 import time
 import platform
@@ -32,6 +32,9 @@ Conversation = [
 ]
 connection_status = "Offline 💤"
 
+
+
+#------------------------------------------------------------------------------------------------------------------#
 def start_ollama_background():
     system_os = platform.system()
     
@@ -87,7 +90,9 @@ def start_ollama_background():
     except FileNotFoundError:
         print("Error: Ollama CLI is not installed or not added to your system PATH.")
         return False
+#------------------------------------------------------------------------------------------------------------------#
 
+#------------------------------------------------------------------------------------------------------------------#
 def SaveAsJson(Conversation):
     try:
         os.mkdir("Data")
@@ -104,12 +109,48 @@ def ListFiles(Folder_path = json_path):
         new_file = file.removesuffix(".json")
 
     return files
+#------------------------------------------------------------------------------------------------------------------#
+def get_time():
+    from datetime import datetime
+
+    return datetime.now().strftime(
+        "%H:%M:%S"
+    )
+
+def search_web(query):
+
+    with DDGS() as ddgs:
+        results = list(ddgs.text(query,max_results=5))
+    return results
+
+TOOLS = {
+
+    "get_time": get_time,
+    "search_web": search_web
 
 
+}
+
+
+#------------------------------------------------------------------------------------------------------------------#
 class Raphael:
     def __init__(self):
-        self.conversation = Conversation.copy()
+        self.conversation = copy.deepcopy(Conversation)
         self.connection_status = connection_status
+        self.memory = ""
+
+        try:
+            with open("Memories/Memories.json", "r") as file:
+                self.memory = json.load(file)
+        except:
+            self.memory = ""
+
+        memories_message =  {
+                "role": "system",
+                "content": f"Your memories:{self.memory}"
+            }
+
+        self.conversation.append(memories_message)
 
         if start_ollama_background():
             self.connection_status = "Online 🌐"
@@ -160,8 +201,8 @@ class Raphael:
         ctk.CTkLabel(self.root, text=f"Model: {model}").place(relx=0.88,rely=0.95,anchor="center")
 
         #chat selection
-        Chat_selection = ctk.CTkComboBox(self.root,values=ListFiles(),state="readonly",command=self.chat_select)
-        Chat_selection.place(relx = 0.1 , anchor ="center", rely = 0.17,relwidth = 0.16, relheight = 0.05)
+        self.Chat_selection = ctk.CTkComboBox(self.root,values=ListFiles(),state="readonly",command=self.chat_select)
+        self.Chat_selection.place(relx = 0.1 , anchor ="center", rely = 0.17,relwidth = 0.16, relheight = 0.05)
 
         #new chat button and save chat button
         ctk.CTkButton(self.root,text="Save chat",command= self.save_chat).place(relx = 0.1,anchor="center",rely = 0.8,relwidth = 0.13)
@@ -180,7 +221,7 @@ class Raphael:
         self.send_button.place(relx = 0.925 , rely = 0.83 , anchor ="center" ,relheight = 0.085 , relwidth = 0.085)
         
     def chat_select(self,selected_chat):
-        with open(f"Data/{selected_chat}") as file:
+        with open(f"Data/{selected_chat}.json") as file:
             data = json.load(file)
             self.save_chat()
             self.chat_box.configure(state="normal")
@@ -200,12 +241,62 @@ class Raphael:
         self.chat_box.configure(state="disabled")
 
     def Generate_Response(self, Convo):
-        self.repsonse = ollama.chat(
+        
+        tools = [
+                    {
+        "type": "function",
+        "function": {
+            "name": "get_time",
+            "description": "Returns the current time",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+                            }
+                    }
+                     },
+                     {
+
+    "type": "function",
+    "function": {
+        "name": "search_web",
+        "description": "Search the internet",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string"
+                }},
+            "required": ["query"]
+        }
+    }
+}
+                ]
+
+        self.response = ollama.chat(
             model = model,
-            messages=Convo
+            messages=Convo,
+            tools=tools
         )
 
-        reply = self.repsonse["message"]["content"]
+        tool_calls = self.response["message"].get("tool_calls")
+
+        if tool_calls:
+            for tool_call in tool_calls:
+                function_name = tool_call["function"]["name"]
+                arguments = tool_call["function"]["arguments"]
+                result = TOOLS[function_name](**arguments)
+
+
+            Convo.append({
+                "role": "tool",
+                "content": str(result)})
+            
+            self.response = ollama.chat(
+    model=model,
+    messages=Convo
+)
+
+        reply = self.response["message"]["content"]
 
         reply_message = {
             "role" : "assistant",
@@ -250,18 +341,20 @@ class Raphael:
         ).start()
     
     def new_chat(self):
-        self.conversation = Conversation.copy()
+        self.conversation = copy.deepcopy(Conversation)
 
         self.chat_box.configure(state="normal")
         self.chat_box.delete("1.0", "end")
         self.chat_box.configure(state="disabled")
     
     def save_chat(self):
+        if len(self.conversation) <= 1:
+            return
         try:
             os.mkdir("Data")
         except:
             pass
-        convo_copy = self.conversation.copy()
+        convo_copy = copy.deepcopy(self.conversation)
         convo_copy.append({
             "role" : "user",
             "content": "summarize this convo in 3 words and dont say anything else"
@@ -272,19 +365,40 @@ class Raphael:
             messages = convo_copy
         )
         filename = filename_total["message"]["content"]
+        filename = re.sub(
+            r'[<>:"/\\\\|?*]',
+            "",
+            filename).strip()
+        filename = filename[:50]
+        if not filename:
+            filename = "Untitled Chat"
         file = f"{filename}.json"
         with open(f"Data/{filename}" , "w") as f:
             json.dump(self.conversation, f)
         self.add_memories()
+        self.Chat_selection.configure(
+                values=ListFiles()
+)
 
     def add_memories(self):
-        with open("Memories/Memories.json") as file:
-            data = json.load(file)
+        try:
+            with open("Memories/Memories.json") as file:
+                data = json.load(file)
+        except (FileNotFoundError , json.JSONDecodeError):
+            data = ""
 
-        temp = self.conversation.copy()
+        temp = copy.deepcopy(self.conversation)
         temp.append({
             "role" : "system",
-            "content" : f"Hello Raphael. These are your memories '{data}',Now return me a summarize this along with the conversation that you just had. Think of it like appending it to your memories, and do not forget anything."
+            "content" : f"""Hello Raphael. These are your memories '{data}',Now return me a summarize this along with the conversation that you just had.
+                            Update the memory list.
+                            Only include factual information.
+                            Do not infer anything.
+                            Do not guess.
+                            Do summarize the entire conversation and extract the information from those chat which needs to be remembered and dont forget to update your memory with the things the user clearly wants you to remember"
+                            Only store information likely to be useful in future chats.
+                            Also this is not like prompt your going to reply to just list the things.
+                        """
         })
         reply = ollama.chat(
             model = model,
@@ -292,11 +406,11 @@ class Raphael:
         )
         memory = reply["message"]["content"]
         with open("Memories/Memories.json", "w") as file:
-            pass 
-        with open("Memories/Memories.json", "w") as file:
-            json.dump([memory] , file)
+            json.dump(memory , file , indent=4)
+#------------------------------------------------------------------------------------------------------------------#
 
-
+#------------------------------------------------------------------------------------------------------------------#
 # Initialization
 if __name__ == "__main__":
     Raphael()
+#------------------------------------------------------------------------------------------------------------------#
