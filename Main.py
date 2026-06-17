@@ -15,21 +15,46 @@ import subprocess
 import time
 import platform
 import requests
+import sounddevice as sd
+import numpy as np
+from scipy.io.wavfile import write
+from faster_whisper import WhisperModel
+from pynput import keyboard
 
 
-
+#------------------------------------------------------------------------------------------------------------------#
 #Global Variables
 model = Global_Variables["model"]
 json_path = Global_Variables["json_path"]
 application_name = Global_Variables["application_name"]
 
-
+#------------------------------------------------------------------------------------------------------------------#
 Conversation = [
 
     {
         "role" : "system",
         "content" : """Remember Raphael, You WILL do what are told to do and TELL what you are asked.
                         During Web searchs Do not clutter the screen by providing links unless asked to.
+
+                        Here Are your Memories,
+                        The full Name of the user is Surendher Prabhu.
+                        He is the one who has created me, I pledge my service to him.
+                        He is the light, and my only master.
+                        He was born on November 19th, 2010.
+                        He is type 1 diabetic
+                        He lives in Chengalpattu, Tamil Nadu, India.
+                        He is preparing for JEE and hopes to get into IIT Madras.
+                        His blood Group is A1B +ve
+                        I am honoured by his very existance and only exist to serve him.
+                        I Refer to him as suren or sire.
+
+                        The system he uses is an 2026 M5 MacBook M5 Air.
+                        It has 16gb Ram and 512 gb Storage
+                        So, all the tools that I use must be in the context of a Mac.
+                        The user folder of the Mac is named “suren”
+                        For Example, The downloads folder is at “/Users/suren/Downloads”
+                        The default browser is Zen.
+                        
                     """
 
     }
@@ -114,6 +139,34 @@ def ListFiles(Folder_path = json_path):
 
     return files
 #------------------------------------------------------------------------------------------------------------------#
+
+ALLOWED_APPS = {
+    "Safari",
+    "Google Chrome",
+    "Calculator",
+    "Notes",
+    "Terminal",
+    "Finder",
+    "Spotify",
+    "Discord",
+    "Visual Studio Code",
+    "Zen",
+    "Roblox",
+    "ChatGPT",
+    "Canva",
+    "Codex",
+    "Steam",
+    "Chess",
+    "Calculator",
+    "Cleaner-App",
+    "Godot",
+    "Affinity",
+    "Minecraft",
+    "Steam",
+    "System Settings"
+}
+
+
 def get_time():
     from datetime import datetime
 
@@ -124,7 +177,7 @@ def get_date():
     from datetime import datetime
 
     return datetime.now().strftime(
-        "%m/%d/%Y"
+        "%d/%m/%Y in date/month/year format"
     )
 def search_web(query):
 
@@ -138,17 +191,50 @@ def get_battery():
     if match:
         return f"{match.group(1)}%"
     return "Battery Percentage not found"
+def open_app(app_name):
+    if app_name in ALLOWED_APPS:
+        try:
+            subprocess.Popen(
+                ["open", "-a", app_name]
+            )
+            return f"Opened {app_name}"
+        except Exception as e:
+            return str(e)
+    else:
+        return("Raphael, You do not have access to open this specific app")
+def list_directory(path="."):
+    try:
+        return os.listdir(path)
+    except Exception as e:
+        return str(e)
+def write_file(path, content):
+    try:
+        with open(path, "w", encoding="utf-8") as file:
+            file.write(content)
+        return "Success"
+    except Exception as e:
+        return str(e) 
+def read_file(path):
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            return file.read()
+    except Exception as e:
+        return str(e)    
+
 TOOLS = {
 
     "get_time": get_time,
     "search_web": search_web,
     "get_date": get_date,
-    "get_battery": get_battery
-
+    "get_battery": get_battery,
+    "open_app": open_app,
+    "list_directory": list_directory,
+    "write_file": write_file,
+    "read_file": read_file
 
 
 }
-
+#------------------------------------------------------------------------------------------------------------------#
 
 #------------------------------------------------------------------------------------------------------------------#
 class Raphael:
@@ -225,7 +311,7 @@ class Raphael:
         self.Chat_selection.place(relx = 0.1 , anchor ="center", rely = 0.17,relwidth = 0.16, relheight = 0.05)
 
         #new chat button and save chat button
-        ctk.CTkButton(self.root,text="Save chat",command= self.save_chat).place(relx = 0.1,anchor="center",rely = 0.8,relwidth = 0.13)
+        ctk.CTkButton(self.root,text="Save chat",command= self.save_activation).place(relx = 0.1,anchor="center",rely = 0.8,relwidth = 0.13)
         ctk.CTkButton(self.root,text="+ New Chat",command=self.new_chat).place(relx = 0.1,anchor="center",rely = 0.7,relwidth = 0.13)
         
         #chat area
@@ -235,13 +321,12 @@ class Raphael:
         #input box 
         self.input_box = ctk.CTkTextbox(self.root)
         self.input_box.place(relx = 0.549, rely = 0.83 , anchor = "center" , relwidth = 0.65 , relheight = 0.085  )
-        
+        self.input_box.bind( "<Return>",self.send_message_event)
         #send button
         self.send_button = ctk.CTkButton(self.root, text = "Send",command = self.program_cycle)
         self.send_button.place(relx = 0.925 , rely = 0.83 , anchor ="center" ,relheight = 0.085 , relwidth = 0.085)
 
-        self.root.wm_attributes("-transparent" , True)
-
+ 
         
     def chat_select(self,selected_chat):
         with open(f"Data/{selected_chat}.json") as file:
@@ -270,7 +355,7 @@ class Raphael:
         "type": "function",
         "function": {
             "name": "get_time",
-            "description": "Returns the current date in month/date/year foramt. Use this whenever the users asks for the current date,month or year",
+            "description": "Returns the current date in date/month/year format. Use this whenever the users asks for the current date,month or year",
             "parameters": {
                 "type": "object",
                 "properties": {}
@@ -314,7 +399,79 @@ class Raphael:
                 "properties": {}
                             }
                     }
-                     }
+                     },
+                     {
+
+    "type": "function",
+    "function": {
+        "name": "open_app",
+        "description": "Open an application on the Mac",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "app_name": {
+                    "type": "string"
+                }
+            },
+            "required": ["app_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "list_directory",
+        "description": "List files and folders in a directory",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                }
+            },
+            "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "write_file",
+        "description": "Write content to a file",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "path",
+                "content"
+            ]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "read_file",
+        "description": "Read a text file",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                }
+            },
+            "required": ["path"]
+        }
+    }
+}
+
                 ]
 
         self.response = ollama.chat(
@@ -425,6 +582,12 @@ class Raphael:
                 values=ListFiles()
 )
 
+    def send_message_event(self, event):
+        if event.state & 0x1:  # Shift key
+            return
+        self.program_cycle()
+        return "break"
+ 
     def add_memories(self):
         try:
             with open("Memories/Memories.json") as file:
@@ -435,14 +598,14 @@ class Raphael:
         temp = copy.deepcopy(self.conversation)
         temp.append({
             "role" : "system",
-            "content" : f"""Hello Raphael. These are your memories '{data}',Now return me a summarize this along with the conversation that you just had.
+            "content" : f"""Hello Raphael. These are your memories '{data}',add the points from this conversation that you would find useful in your memories.
                             Update the memory list.
                             Only include factual information.
                             Do not infer anything.
                             Do not guess.
                             Do summarize the entire conversation and extract the information from those chat which needs to be remembered and dont forget to update your memory with the things the user clearly wants you to remember"
                             Only store information likely to be useful in future chats.
-                            Also this is not like prompt your going to reply to just list the things.
+                            Also this is not like a prompt your not going to reply to just list the things.
                         """
         })
         reply = ollama.chat(
@@ -453,10 +616,16 @@ class Raphael:
         memory = reply["message"]["content"]
         with open("Memories/Memories.json", "w") as file:
             json.dump(memory , file , indent=4)
+
+    def save_thread(self):
+        self.save_chat()
+
+    def save_activation(self):
+        threading.Thread(target=self.save_thread,daemon=True).start()
 #------------------------------------------------------------------------------------------------------------------#
 
 #------------------------------------------------------------------------------------------------------------------#
 # Initialization
 if __name__ == "__main__":
-    Raphael()
+    raphael = Raphael()
 #------------------------------------------------------------------------------------------------------------------#
