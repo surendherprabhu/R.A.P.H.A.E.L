@@ -243,6 +243,14 @@ class Raphael:
         self.connection_status = connection_status
         self.memory = ""
 
+        self.recording = False
+        self.audio_frames = []
+        self.stream = None
+        self.whisper_model = WhisperModel("base",
+                                          device = "auto",
+                                          compute_type="int8")
+
+
         try:
             with open("Memories/Memories.json", "r") as file:
                 self.memory = json.load(file)
@@ -260,6 +268,65 @@ class Raphael:
             self.connection_status = "Online 🌐"
             self.create_window()
             self.root.mainloop()
+
+    def process_voice(self):
+        self.voice_segments, self.voice_info = self.whisper_model.transcribe("voice.wav")
+
+        self.voice_text = ""
+        for segment in self.voice_segments:
+            self.voice_text += segment.text
+
+        self.voice_text_result = self.voice_text
+        self.input_box.delete("1.0","end" )
+
+        self.input_box.insert("1.0",self.voice_text_result)
+        self.program_cycle()
+  
+
+        
+
+    def start_recording(self, event=None):
+        if self.recording:
+            return
+        
+        print("Started Recording")
+
+        self.recording = True
+        self.audio_frames = []
+
+        def callback(indata, frames, time, status):
+            if self.recording:
+                self.audio_frames.append(indata.copy())
+            
+        self.stream = sd.InputStream(
+            samplerate=16000,
+            channels=1,
+            callback=callback
+        )
+
+        self.stream.start()
+
+    def stop_recording(self, event=None):
+        if not self.recording:
+            return
+        
+        print("Stopped Recording")
+
+        self.recording = False
+
+        self.stream.stop()
+        self.stream.close()
+
+        if len(self.audio_frames) == 0:
+            print("No Audio Recorded")
+            return
+
+        audio = np.concatenate(self.audio_frames, axis = 0)
+
+        write("voice.wav" , 16000 , audio)
+        print("Saved Voice")
+        self.process_voice()
+
 
     def create_window(self):
         self.root = ctk.CTk(
@@ -326,6 +393,8 @@ class Raphael:
         self.send_button = ctk.CTkButton(self.root, text = "Send",command = self.program_cycle)
         self.send_button.place(relx = 0.925 , rely = 0.83 , anchor ="center" ,relheight = 0.085 , relwidth = 0.085)
 
+        self.root.bind("<KeyPress-Alt_L>", self.start_recording)
+        self.root.bind("<KeyRelease-Alt_L>", self.stop_recording)
  
         
     def chat_select(self,selected_chat):
