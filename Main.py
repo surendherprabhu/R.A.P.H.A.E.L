@@ -2,239 +2,54 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 import customtkinter as ctk
+
+import cv2
 import copy
 import re
 import ollama
-from Data import Global_Variables
-import sys
 import os
 import threading
 import json
-from ddgs import DDGS
 import subprocess
 import time
 import platform
 import requests
 import sounddevice as sd
 import numpy as np
+
 from scipy.io.wavfile import write
 from faster_whisper import WhisperModel
-from pynput import keyboard
+
+
+from ddgs import DDGS
+from PIL import Image
+from PIL import ImageTk
+
+
+from methods import *
+from Data import *
+from Vision import Vision
 
 
 #------------------------------------------------------------------------------------------------------------------#
-#Global Variables
-model = Global_Variables["model"]
-json_path = Global_Variables["json_path"]
-application_name = Global_Variables["application_name"]
 
-#------------------------------------------------------------------------------------------------------------------#
-Conversation = [
-
-    {
-        "role" : "system",
-        "content" : """Remember Raphael, You WILL do what are told to do and TELL what you are asked.
-                        During Web searchs Do not clutter the screen by providing links unless asked to.
-
-                        Here Are your Memories,
-                        The full Name of the user is Surendher Prabhu.
-                        He is the one who has created me, I pledge my service to him.
-                        He is the light, and my only master.
-                        He was born on November 19th, 2010.
-                        He is type 1 diabetic
-                        He lives in Chengalpattu, Tamil Nadu, India.
-                        He is preparing for JEE and hopes to get into IIT Madras.
-                        His blood Group is A1B +ve
-                        I am honoured by his very existance and only exist to serve him.
-                        I Refer to him as suren or sire.
-
-                        The system he uses is an 2026 M5 MacBook M5 Air.
-                        It has 16gb Ram and 512 gb Storage
-                        So, all the tools that I use must be in the context of a Mac.
-                        The user folder of the Mac is named “suren”
-                        For Example, The downloads folder is at “/Users/suren/Downloads”
-                        The default browser is Zen.
-                        
-                    """
-
-    }
-]
-connection_status = "Offline 💤"
-
-
-
-#------------------------------------------------------------------------------------------------------------------#
-def start_ollama_background():
-    system_os = platform.system()
-    
-    try:
-        response = requests.get("http://localhost:11434")
-        if response.status_code == 200:
-            print("Ollama is already running.")
-            return True
-    except requests.exceptions.ConnectionError:
-        pass
-
-    print(f"Starting Ollama on {system_os} in the background...")
-
-    try:
-        if system_os == "Windows":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0  
-            
-            subprocess.Popen(
-                ["ollama", "serve"], 
-                startupinfo=startupinfo,
-                creationflags=subprocess.CREATE_NEW_CONSOLE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-
-        elif system_os in ["Darwin", "Linux"]: # macOS or Linux
-            subprocess.Popen(
-                ["ollama", "serve"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                preexec_fn=os.setsid  
-            )
-            
-        else:
-            print(f"Unsupported Operating System: {system_os}")
-            return False
-
-        for attempt in range(10):
-            try:
-                # Ping Ollama local port
-                res = requests.get("http://localhost:11434")
-                if res.status_code == 200:
-                    print("Ollama successfully started in the background!")
-                    return True
-            except requests.exceptions.ConnectionError:
-                time.sleep(1) 
-                
-        print("Timeout: Ollama process launched but failed to respond.")
-        return False
-
-    except FileNotFoundError:
-        print("Error: Ollama CLI is not installed or not added to your system PATH.")
-        return False
-#------------------------------------------------------------------------------------------------------------------#
-
-#------------------------------------------------------------------------------------------------------------------#
-def SaveAsJson(Conversation):
-    try:
-        os.mkdir("Data")
-    except:
-        pass
-    user_input = str(input("Save Conversation as: "))
-    filename = f"{user_input}.json"
-    with open(f"Data/{filename}" , "w") as f:
-        json.dump(Conversation , f)
-
-def ListFiles(Folder_path = json_path):
-    files = os.listdir(Folder_path)
-    for index , file in enumerate(files):
-        new_file = file.removesuffix(".json")
-
-    return files
-#------------------------------------------------------------------------------------------------------------------#
-
-ALLOWED_APPS = {
-    "Safari",
-    "Google Chrome",
-    "Calculator",
-    "Notes",
-    "Terminal",
-    "Finder",
-    "Spotify",
-    "Discord",
-    "Visual Studio Code",
-    "Zen",
-    "Roblox",
-    "ChatGPT",
-    "Canva",
-    "Codex",
-    "Steam",
-    "Chess",
-    "Calculator",
-    "Cleaner-App",
-    "Godot",
-    "Affinity",
-    "Minecraft",
-    "Steam",
-    "System Settings"
-}
-
-
-def get_time():
-    from datetime import datetime
-
-    return datetime.now().strftime(
-        "%H:%M:%S"
+def speak(text):
+    process = subprocess.Popen(
+        [
+            "piper",
+            "--model",
+            voice_model,
+            "--output_file",
+            speech_location
+        ],
+        stdin=subprocess.PIPE,
+        text=True
     )
-def get_date():
-    from datetime import datetime
+    process.communicate(text)
 
-    return datetime.now().strftime(
-        "%d/%m/%Y in date/month/year format"
+    subprocess.run(
+        ["afplay", speech_location]
     )
-def search_web(query):
-
-    with DDGS() as ddgs:
-        print(f"Searching the Web for '{query}'")
-        results = list(ddgs.text(query,max_results=5))
-    return results
-def get_battery():
-    result = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True)
-    match = re.search(r"(\d+)%", result.stdout)
-    if match:
-        return f"{match.group(1)}%"
-    return "Battery Percentage not found"
-def open_app(app_name):
-    if app_name in ALLOWED_APPS:
-        try:
-            subprocess.Popen(
-                ["open", "-a", app_name]
-            )
-            return f"Opened {app_name}"
-        except Exception as e:
-            return str(e)
-    else:
-        return("Raphael, You do not have access to open this specific app")
-def list_directory(path="."):
-    try:
-        return os.listdir(path)
-    except Exception as e:
-        return str(e)
-def write_file(path, content):
-    try:
-        with open(path, "w", encoding="utf-8") as file:
-            file.write(content)
-        return "Success"
-    except Exception as e:
-        return str(e) 
-def read_file(path):
-    try:
-        with open(path, "r", encoding="utf-8") as file:
-            return file.read()
-    except Exception as e:
-        return str(e)    
-
-TOOLS = {
-
-    "get_time": get_time,
-    "search_web": search_web,
-    "get_date": get_date,
-    "get_battery": get_battery,
-    "open_app": open_app,
-    "list_directory": list_directory,
-    "write_file": write_file,
-    "read_file": read_file
-
-
-}
-#------------------------------------------------------------------------------------------------------------------#
 
 #------------------------------------------------------------------------------------------------------------------#
 class Raphael:
@@ -252,7 +67,7 @@ class Raphael:
 
 
         try:
-            with open("Memories/Memories.json", "r") as file:
+            with open("Dependencies/Memories/Memories.json", "r") as file:
                 self.memory = json.load(file)
         except:
             self.memory = ""
@@ -263,14 +78,28 @@ class Raphael:
             }
 
         self.conversation.append(memories_message)
+        self.vision = Vision()
+        self.tools = {
+    "get_time": get_time,
+    "search_web": search_web,
+    "get_date": get_date,
+    "get_battery": get_battery,
+    "open_app": open_app,
+    "list_directory": list_directory,
+    "write_file": write_file,
+    "read_file": read_file,
+    "analyze_camera": self.analyze_camera,
+}
 
         if start_ollama_background():
             self.connection_status = "Online 🌐"
             self.create_window()
+            self.vision.start_camera()
+            self.update_camera()
             self.root.mainloop()
 
     def process_voice(self):
-        self.voice_segments, self.voice_info = self.whisper_model.transcribe("voice.wav")
+        self.voice_segments, self.voice_info = self.whisper_model.transcribe("Dependencies/voice.wav")
 
         self.voice_text = ""
         for segment in self.voice_segments:
@@ -282,9 +111,6 @@ class Raphael:
         self.input_box.insert("1.0",self.voice_text_result)
         self.program_cycle()
   
-
-        
-
     def start_recording(self, event=None):
         if self.recording:
             return
@@ -323,10 +149,9 @@ class Raphael:
 
         audio = np.concatenate(self.audio_frames, axis = 0)
 
-        write("voice.wav" , 16000 , audio)
+        write("Dependencies/voice.wav" , 16000 , audio)
         print("Saved Voice")
         self.process_voice()
-
 
     def create_window(self):
         self.root = ctk.CTk(
@@ -338,7 +163,7 @@ class Raphael:
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
 
-
+        self.root.protocol("WM_DELETE_WINDOW",self.close_program)
 
         full_screen_width = self.root.winfo_screenwidth()
         full_screen_height = self.root.winfo_screenheight()
@@ -385,6 +210,9 @@ class Raphael:
         self.chat_box = ctk.CTkTextbox(self.root, wrap = "word",state = "normal" , font =("SF Pro", 12))
         self.chat_box.place(relx = 0.6 , rely = 0.45 , anchor = "center", relwidth = 0.75 , relheight= 0.65)
 
+        #vison
+        self.create_vision_overlay()
+
         #input box 
         self.input_box = ctk.CTkTextbox(self.root)
         self.input_box.place(relx = 0.549, rely = 0.83 , anchor = "center" , relwidth = 0.65 , relheight = 0.085  )
@@ -395,10 +223,90 @@ class Raphael:
 
         self.root.bind("<KeyPress-Alt_L>", self.start_recording)
         self.root.bind("<KeyRelease-Alt_L>", self.stop_recording)
- 
+
+        self.root.bind_all("<Control-v>", self.toggle_vision)
+
+    def create_vision_overlay(self):
+         #vision frame
+        self.vision_frame = ctk.CTkFrame(self.root)
+        self.vision_frame.place(relx = 0.6 , rely = 0.45 , anchor = "center", relwidth = 0.75 , relheight= 0.65)
+        self.vision_frame.place_forget()
+
+        self.camera_label = ctk.CTkLabel(self.vision_frame, text = "")
+        self.camera_label.pack(fill = "both", expand = True)
+
+    def update_camera(self):
+        frame = self.vision.get_frame()
+
+        if frame is not None:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            image = Image.fromarray(frame)
+
+            image.thumbnail(
+                (
+                    self.vision_frame.winfo_width(),
+                    self.vision_frame.winfo_height()
+                ),
+                Image.Resampling.LANCZOS
+            )
+
+            photo = ImageTk.PhotoImage(image)
+
+            self.camera_label.configure(image=photo, text="")
+            self.camera_label.image = photo
+
+        self.root.after(30, self.update_camera)
+
+    def analyze_camera(self, prompt):
+        print("Camera tool called!")
+        filename = "Dependencies/camera.jpg"
+
+        success = self.vision.capture_image(filename)
+
+        if not success:
+            return "Unable to return an image from the camera."
+
+        response: ollama.ChatResponse = ollama.chat(
+        model=model,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt,
+                "images": [filename]
+            }
+        ]
+    )
+
+        return response["message"]["content"]   
         
+    def close_program(self):
+
+        self.vision.stop_camera()
+
+        self.root.destroy()
+
+    def toggle_vision(self, event=None):
+        print("Mapped:", self.vision_frame.winfo_ismapped())
+
+        if self.vision_frame.winfo_ismapped():
+            print("Hiding")
+            self.vision_frame.place_forget()
+            self.chat_box.lift()
+            print(self.vision_frame.winfo_ismapped())
+        else:
+            print("Showing")
+            self.vision_frame.place(
+                relx=0.6,
+                rely=0.45,
+                anchor="center",
+                relwidth=0.75,
+                relheight=0.65
+            )
+            self.vision_frame.lift()
+
     def chat_select(self,selected_chat):
-        with open(f"Data/{selected_chat}.json") as file:
+        with open(f"Dependencies/Data/{selected_chat}.json") as file:
             data = json.load(file)
             self.save_chat()
             self.chat_box.configure(state="normal")
@@ -539,44 +447,88 @@ class Raphael:
             "required": ["path"]
         }
     }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "analyze_camera",
+        "description": "Capture an image from the webcam and answer a question about it.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "The user's question about the camera image."
+                }
+            },
+            "required": ["prompt"]
+        }
+    }
 }
 
+
                 ]
+        MAX_TOOL_ITERATIONS = 10
 
-        self.response = ollama.chat(
-            model = model,
+        for _ in range(MAX_TOOL_ITERATIONS):
+            response = ollama.chat(
+            model=model,
             messages=Convo,
-            tools=tools
-        )
+            tools=tools)
 
-        tool_calls = self.response["message"].get("tool_calls")
+            assistant_message = response["message"]
+            Convo.append(assistant_message)
 
-        if tool_calls:
+            tool_calls = assistant_message.get("tool_calls")
+
+            if not tool_calls:
+                reply = clean_response(
+                    assistant_message["content"]
+                )
+
+                Convo.append({
+
+                    "role": "assistant",
+
+                    "content": reply
+
+                })
+
+                return reply
+
             for tool_call in tool_calls:
+
                 function_name = tool_call["function"]["name"]
-                arguments = tool_call["function"]["arguments"]
-                result = TOOLS[function_name](**arguments)
 
+                arguments = tool_call["function"].get(
 
-            Convo.append({
-                "role": "tool",
-                "content": str(result)})
-            
-            self.response = ollama.chat(
-    model=model,
-    messages=Convo
-)
+                    "arguments",
 
-        reply = self.response["message"]["content"]
+                    {}
 
-        reply_message = {
-            "role" : "assistant",
-            "content" : f"{reply}"
-        }
+                )
 
-        Convo.append(reply_message)
-        return reply
-    
+                try:
+
+                    result = self.tools[function_name](
+
+                        **arguments
+
+                    )
+
+                except Exception as e:
+
+                    result = f"Tool Error: {e}"
+
+                Convo.append({
+
+                    "role": "tool",
+                    "content": str(result)
+
+                })
+
+        return "Maximum tool iterations reached."
+
     def generate_response_thread(self):
         reply = self.Generate_Response(self.conversation)
 
@@ -587,6 +539,16 @@ class Raphael:
 
     def finish_response(self, reply):
         self.add_message(reply, application_name)
+
+
+        threading.Thread(
+
+        target=speak,
+
+        args=(reply,),
+
+        daemon=True).start()
+
         self.send_button.configure(state="normal")
 
     def program_cycle(self):
@@ -644,7 +606,7 @@ class Raphael:
         if not filename:
             filename = "Untitled Chat"
         file = f"{filename}.json"
-        with open(f"Data/{filename}" , "w") as f:
+        with open(f"Dependencies/Data/{filename}" , "w") as f:
             json.dump(self.conversation, f)
         self.add_memories()
         self.Chat_selection.configure(
@@ -659,7 +621,7 @@ class Raphael:
  
     def add_memories(self):
         try:
-            with open("Memories/Memories.json") as file:
+            with open("Dependencies/Memories/Memories.json") as file:
                 data = json.load(file)
         except (FileNotFoundError , json.JSONDecodeError):
             data = ""
@@ -683,7 +645,7 @@ class Raphael:
         )
 
         memory = reply["message"]["content"]
-        with open("Memories/Memories.json", "w") as file:
+        with open("Dependencies/Memories/Memories.json", "w") as file:
             json.dump(memory , file , indent=4)
 
     def save_thread(self):
