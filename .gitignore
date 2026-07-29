@@ -1,1 +1,8 @@
 *.onnx
+.DS_Store
+__pycache__/
+*.py[cod]
+build/
+dist/
+Dependencies/*.wav
+Dependencies/camera.jpg

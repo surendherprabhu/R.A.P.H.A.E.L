@@ -116,11 +116,21 @@ def SaveAsJson(Conversation):
         json.dump(Conversation , f)
 
 def ListFiles(Folder_path = json_path):
-    files = os.listdir(Folder_path)
-    for index , file in enumerate(files):
-        new_file = file.removesuffix(".json")
+    try:
+        files = os.listdir(Folder_path)
+    except FileNotFoundError:
+        os.makedirs(Folder_path, exist_ok=True)
+        return []
 
-    return files
+    chat_files = []
+    for file in files:
+        if file.startswith("."):
+            continue
+        path = os.path.join(Folder_path, file)
+        if os.path.isfile(path):
+            chat_files.append(file.removesuffix(".json"))
+
+    return sorted(chat_files)
 
 #------------------------------------------------------------------------------------------------------------------#
 def get_time():

@@ -218,7 +218,7 @@ Your goal is to feel like a trusted collaborator rather than a chatbot.
     }
 ]
 
-voice_model = "Non_Github_Dependencies/Voices/voice.onnx"
+voice_model = "Non_Github_Dependencies/Voices/en_GB-alan-medium.onnx"
 
 speech_location = "Dependencies/speech.wav"
 

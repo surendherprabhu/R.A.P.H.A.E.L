@@ -306,7 +306,11 @@ class Raphael:
             self.vision_frame.lift()
 
     def chat_select(self,selected_chat):
-        with open(f"Dependencies/Data/{selected_chat}.json") as file:
+        json_file = f"Dependencies/Data/{selected_chat}.json"
+        legacy_file = f"Dependencies/Data/{selected_chat}"
+        chat_file = json_file if os.path.exists(json_file) else legacy_file
+
+        with open(chat_file) as file:
             data = json.load(file)
             self.save_chat()
             self.chat_box.configure(state="normal")
@@ -583,10 +587,8 @@ class Raphael:
     def save_chat(self):
         if len(self.conversation) <= 1:
             return
-        try:
-            os.mkdir("Data")
-        except:
-            pass
+
+        os.makedirs("Dependencies/Data", exist_ok=True)
         convo_copy = copy.deepcopy(self.conversation)
         convo_copy.append({
             "role" : "user",
@@ -606,7 +608,7 @@ class Raphael:
         if not filename:
             filename = "Untitled Chat"
         file = f"{filename}.json"
-        with open(f"Dependencies/Data/{filename}" , "w") as f:
+        with open(f"Dependencies/Data/{file}" , "w") as f:
             json.dump(self.conversation, f)
         self.add_memories()
         self.Chat_selection.configure(
