@@ -9,6 +9,7 @@ import re
 import ollama
 import os
 import threading
+import multiprocessing
 import json
 import subprocess
 import time
@@ -61,9 +62,8 @@ class Raphael:
         self.recording = False
         self.audio_frames = []
         self.stream = None
-        self.whisper_model = WhisperModel("base",
-                                          device = "auto",
-                                          compute_type="int8")
+        self.camera_ready = False
+        self.whisper_model = None
 
 
         try:
@@ -88,17 +88,45 @@ class Raphael:
     "list_directory": list_directory,
     "write_file": write_file,
     "read_file": read_file,
+    "create_directory": create_directory,
+    "get_system_info": get_system_info,
+    "open_website": open_website,
+    "read_clipboard": read_clipboard,
+    "write_clipboard": write_clipboard,
+    "list_running_apps": list_running_apps,
+    "get_calendar_events": get_calendar_events,
+    "create_reminder": create_reminder,
+    "take_screenshot": take_screenshot,
+    "extract_text_from_image": extract_text_from_image,
+    "media_control": media_control,
+    "volume_control": volume_control,
     "analyze_camera": self.analyze_camera,
 }
 
+        self.create_window()
+
         if start_ollama_background():
             self.connection_status = "Online 🌐"
-            self.create_window()
-            self.vision.start_camera()
-            self.update_camera()
-            self.root.mainloop()
+        else:
+            self.connection_status = "Offline 💤"
+
+        self.connection_label.configure(text=self.connection_status)
+
+        self.camera_ready = self.vision.start_camera()
+        if not self.camera_ready:
+            print("Camera unavailable. Starting without vision.")
+
+        self.update_camera()
+        self.root.mainloop()
 
     def process_voice(self):
+        if self.whisper_model is None:
+            self.whisper_model = WhisperModel(
+                "base",
+                device="auto",
+                compute_type="int8"
+            )
+
         self.voice_segments, self.voice_info = self.whisper_model.transcribe("Dependencies/voice.wav")
 
         self.voice_text = ""
@@ -190,7 +218,8 @@ class Raphael:
         ctk.CTkLabel(self.root,text=application_name).place(relx = 0.1,rely =0.04,anchor = "center",relwidth = 0.15,relheight=0.1)
          
         #Connection Status
-        ctk.CTkLabel(self.root, text=self.connection_status).place(relx = 0.90,rely =0.04,anchor="center",)
+        self.connection_label = ctk.CTkLabel(self.root, text=self.connection_status)
+        self.connection_label.place(relx = 0.90,rely =0.04,anchor="center")
 
         #settings button
         ctk.CTkButton(self.root, text="Settings").place(relx=0.1,rely=0.95,anchor="center",relwidth = 0.14,)
@@ -260,6 +289,8 @@ class Raphael:
 
     def analyze_camera(self, prompt):
         print("Camera tool called!")
+        if not self.vision.is_running():
+            return "Camera is unavailable right now."
         filename = "Dependencies/camera.jpg"
 
         success = self.vision.capture_image(filename)
@@ -449,6 +480,199 @@ class Raphael:
                 }
             },
             "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "create_directory",
+        "description": "Create a directory if it does not exist",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                }
+            },
+            "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_system_info",
+        "description": "Return macOS and Python runtime information",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "open_website",
+        "description": "Open a website in the default browser",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
+                }
+            },
+            "required": ["url"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "read_clipboard",
+        "description": "Read text from the system clipboard",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "write_clipboard",
+        "description": "Write text into the system clipboard",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string"
+                }
+            },
+            "required": ["text"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "list_running_apps",
+        "description": "List currently running foreground applications",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_calendar_events",
+        "description": "Get upcoming calendar events in the next number of hours",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "hours_ahead": {
+                    "type": "integer"
+                },
+                "max_events": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "create_reminder",
+        "description": "Create a reminder in the Reminders app",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string"
+                },
+                "list_name": {
+                    "type": "string"
+                },
+                "due_date": {
+                    "type": "string",
+                    "description": "Natural date string accepted by AppleScript, for example 'Friday at 5:00 PM'."
+                }
+            },
+            "required": ["title"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "take_screenshot",
+        "description": "Capture a screenshot. Use mode full, window, or selection.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string"
+                },
+                "filename": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "extract_text_from_image",
+        "description": "Extract visible text from an image file",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                }
+            },
+            "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "media_control",
+        "description": "Control media playback in Spotify or Music",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "play, pause, play_pause, next, previous"
+                }
+            },
+            "required": ["action"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "volume_control",
+        "description": "Get or control system volume",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "get, set, up, down, mute, unmute"
+                },
+                "level": {
+                    "type": "integer",
+                    "description": "Used when action is set, range 0 to 100"
+                }
+            }
         }
     }
 },
@@ -660,5 +884,6 @@ class Raphael:
 #------------------------------------------------------------------------------------------------------------------#
 # Initialization
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     raphael = Raphael()
 #------------------------------------------------------------------------------------------------------------------#

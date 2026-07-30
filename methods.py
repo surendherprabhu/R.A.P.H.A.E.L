@@ -202,3 +202,249 @@ def read_file(path):
         return str(e)    
 
 #------------------------------------------------------------------------------------------------------------------#
+def create_directory(path):
+    try:
+        os.makedirs(path, exist_ok=True)
+        return f"Directory ready at: {path}"
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def get_system_info():
+    try:
+        return {
+            "os": platform.system(),
+            "release": platform.release(),
+            "version": platform.version(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+            "python_version": platform.python_version(),
+        }
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def open_website(url):
+    try:
+        parsed_url = url.strip()
+        if not parsed_url.startswith(("http://", "https://")):
+            parsed_url = f"https://{parsed_url}"
+
+        subprocess.Popen(["open", parsed_url])
+        return f"Opened website: {parsed_url}"
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def read_clipboard():
+    try:
+        result = subprocess.run(
+            ["pbpaste"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def write_clipboard(text):
+    try:
+        subprocess.run(["pbcopy"], input=text, text=True, check=True)
+        return "Clipboard updated"
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def list_running_apps():
+    try:
+        result = subprocess.run(
+            [
+                "osascript",
+                "-e",
+                'tell application "System Events" to get name of (processes where background only is false)',
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        apps = [app.strip() for app in result.stdout.split(",") if app.strip()]
+        return apps
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def _run_applescript(script):
+    result = subprocess.run(
+        ["osascript", "-e", script],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        message = result.stderr.strip() or "AppleScript command failed"
+        raise RuntimeError(message)
+    return result.stdout.strip()
+
+#------------------------------------------------------------------------------------------------------------------#
+def get_calendar_events(hours_ahead=24, max_events=10):
+    try:
+        hours_ahead = max(1, int(hours_ahead))
+        max_events = max(1, int(max_events))
+
+        script = f'''
+set cutoffDate to (current date) + ({hours_ahead} * hours)
+set eventLines to {{}}
+tell application "Calendar"
+    set allEvents to every event of every calendar whose start date is greater than (current date) and start date is less than cutoffDate
+    set eventCount to 0
+    repeat with anEvent in allEvents
+        set eventCount to eventCount + 1
+        if eventCount > {max_events} then exit repeat
+        set eventTitle to summary of anEvent
+        set eventStart to start date of anEvent
+        set eventEnd to end date of anEvent
+        set end of eventLines to (eventTitle & " | " & (eventStart as string) & " | " & (eventEnd as string))
+    end repeat
+end tell
+if (count of eventLines) is 0 then
+    return "No upcoming events found"
+end if
+return eventLines as string
+'''
+        output = _run_applescript(script)
+        return [line.strip() for line in output.split(",") if line.strip()]
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def create_reminder(title, list_name="Reminders", due_date=""):
+    try:
+        safe_title = title.replace('"', '\\"')
+        safe_list = list_name.replace('"', '\\"')
+
+        if due_date:
+            safe_due = due_date.replace('"', '\\"')
+            script = f'''
+tell application "Reminders"
+    if not (exists list "{safe_list}") then
+        make new list with properties {{name:"{safe_list}"}}
+    end if
+    set targetList to list "{safe_list}"
+    set reminderDate to date "{safe_due}"
+    make new reminder at targetList with properties {{name:"{safe_title}", due date:reminderDate}}
+end tell
+return "Reminder created"
+'''
+        else:
+            script = f'''
+tell application "Reminders"
+    if not (exists list "{safe_list}") then
+        make new list with properties {{name:"{safe_list}"}}
+    end if
+    set targetList to list "{safe_list}"
+    make new reminder at targetList with properties {{name:"{safe_title}"}}
+end tell
+return "Reminder created"
+'''
+        _run_applescript(script)
+        return f"Reminder created: {title}"
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def take_screenshot(mode="full", filename="Dependencies/screenshot.png"):
+    try:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        if mode == "window":
+            command = ["screencapture", "-w", filename]
+        elif mode == "selection":
+            command = ["screencapture", "-i", filename]
+        else:
+            command = ["screencapture", "-x", filename]
+
+        subprocess.run(command, check=True)
+        return f"Screenshot saved to {filename}"
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def extract_text_from_image(path):
+    try:
+        if not os.path.exists(path):
+            return f"Image not found: {path}"
+
+        response = ollama.chat(
+            model=model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Extract all visible text from this image. Return only the extracted text.",
+                    "images": [path],
+                }
+            ],
+        )
+        return response["message"]["content"].strip()
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def media_control(action):
+    try:
+        normalized = action.strip().lower()
+        action_map = {
+            "play": "play",
+            "pause": "pause",
+            "play_pause": "playpause",
+            "playpause": "playpause",
+            "next": "next track",
+            "previous": "previous track",
+            "prev": "previous track",
+        }
+
+        if normalized not in action_map:
+            return "Unsupported action. Use play, pause, play_pause, next, or previous."
+
+        running_apps = list_running_apps()
+        target_app = "Spotify" if isinstance(running_apps, list) and "Spotify" in running_apps else "Music"
+
+        script = f'tell application "{target_app}" to {action_map[normalized]}'
+        _run_applescript(script)
+        return f"Media action sent to {target_app}: {normalized}"
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
+def volume_control(action="get", level=50):
+    try:
+        normalized = action.strip().lower()
+
+        if normalized == "get":
+            return _run_applescript('output volume of (get volume settings)')
+
+        if normalized == "mute":
+            _run_applescript('set volume with output muted')
+            return "Volume muted"
+
+        if normalized == "unmute":
+            _run_applescript('set volume without output muted')
+            return "Volume unmuted"
+
+        if normalized == "set":
+            safe_level = max(0, min(100, int(level)))
+            _run_applescript(f"set volume output volume {safe_level}")
+            return f"Volume set to {safe_level}"
+
+        if normalized in {"up", "down"}:
+            current = int(_run_applescript('output volume of (get volume settings)'))
+            delta = 10 if normalized == "up" else -10
+            new_level = max(0, min(100, current + delta))
+            _run_applescript(f"set volume output volume {new_level}")
+            return f"Volume set to {new_level}"
+
+        return "Unsupported action. Use get, set, up, down, mute, or unmute."
+    except Exception as e:
+        return str(e)
+
+#------------------------------------------------------------------------------------------------------------------#
