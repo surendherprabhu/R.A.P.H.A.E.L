@@ -35,7 +35,33 @@ from settings import Settings
 
 #------------------------------------------------------------------------------------------------------------------#
 
+_speech_process = None
+_speech_lock = threading.Lock()
+
+def stop_speech():
+    """Interrupt current TTS playback (piper/afplay/say)."""
+    global _speech_process
+    with _speech_lock:
+        proc = _speech_process
+        if proc and proc.poll() is None:
+            try:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            except Exception:
+                pass
+        _speech_process = None
+    # Fallback: kill any lingering afplay/say for safety
+    for pat in ["afplay", "say"]:
+        try:
+            subprocess.run(["pkill", "-f", pat], timeout=1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
 def speak(text):
+    global _speech_process
     text = (text or "").strip()
     if not text:
         return
@@ -57,8 +83,6 @@ def speak(text):
 
     if use_piper:
         try:
-            # Limit overly long text for piper (truncate extremely long replies)
-            # Piper handles up to few k chars fine; split if needed
             proc = subprocess.Popen(
                 [
                     "piper",
@@ -79,20 +103,37 @@ def speak(text):
             if not os.path.exists(speech_location) or os.path.getsize(speech_location) < 1000:
                 print("Piper produced no audio, falling back to say")
                 raise RuntimeError("empty wav")
-            # Play with boosted volume (afplay -v 2 is louder)
-            subprocess.run(["afplay", "-v", "2", speech_location], check=False)
+            # Play with boosted volume (afplay -v 2 is louder) - interruptible
+            with _speech_lock:
+                _speech_process = subprocess.Popen(["afplay", "-v", "2", speech_location])
+                p = _speech_process
+            p.wait()
+            with _speech_lock:
+                if _speech_process is p:
+                    _speech_process = None
             return
         except Exception as e:
             print(f"TTS piper path failed: {e}")
 
-    # Fallback: macOS native speech synthesis (always available)
+    # Fallback: macOS native speech synthesis (always available) - interruptible
     try:
-        # Use high-quality voice if available, otherwise default
-        subprocess.run(["say", "-r", "180", text], check=False)
+        with _speech_lock:
+            _speech_process = subprocess.Popen(["say", "-r", "180", text])
+            p = _speech_process
+        p.wait()
+        with _speech_lock:
+            if _speech_process is p:
+                _speech_process = None
     except Exception as e:
         print(f"Fallback say failed: {e}")
         try:
-            subprocess.run(["afplay", speech_location], check=False)
+            with _speech_lock:
+                _speech_process = subprocess.Popen(["afplay", speech_location])
+                p = _speech_process
+            p.wait()
+            with _speech_lock:
+                if _speech_process is p:
+                    _speech_process = None
         except Exception:
             pass
 
@@ -321,6 +362,19 @@ class Raphael:
 
         self.root.bind_all("<Control-v>", self.toggle_vision)
 
+        # Right Alt + period to stop voicing (long TTS)
+        self.right_alt_held = False
+        self.root.bind("<KeyPress-Alt_R>", self._on_right_alt_press)
+        self.root.bind("<KeyRelease-Alt_R>", self._on_right_alt_release)
+        # macOS Option is Alt
+        self.root.bind("<KeyPress-Option_R>", self._on_right_alt_press)
+        self.root.bind("<KeyRelease-Option_R>", self._on_right_alt_release)
+        self.root.bind("<KeyPress-period>", self._handle_stop_voicing)
+        self.root.bind("<KeyPress-greater>", self._handle_stop_voicing)  # period with shift is >
+        # Direct combos for robustness
+        self.root.bind("<Alt_R-period>", self.stop_voicing)
+        self.root.bind("<Option_R-period>", self.stop_voicing)
+
     def create_vision_overlay(self):
          #vision frame
         self.vision_frame = ctk.CTkFrame(self.root)
@@ -380,6 +434,26 @@ class Raphael:
     def update_model_label(self, selected_model):
         self.model_label.configure(text=f"Model: {selected_model}")
 
+    def _on_right_alt_press(self, event=None):
+        self.right_alt_held = True
+
+    def _on_right_alt_release(self, event=None):
+        self.right_alt_held = False
+
+    def _handle_stop_voicing(self, event=None):
+        # Only act if Right Alt is held and period pressed
+        if getattr(self, 'right_alt_held', False) and event and event.keysym in ("period", "greater", "period", "."):
+            return self.stop_voicing(event)
+        return None
+
+    def stop_voicing(self, event=None):
+        print("Stopping voice (Right Alt + .)")
+        try:
+            stop_speech()
+        except Exception as e:
+            print(f"stop_voicing failed: {e}")
+        return "break"
+
     # ---------------- Memory & Context Helpers ----------------
     def _load_memory_text(self):
         data = load_memories()
@@ -425,7 +499,10 @@ class Raphael:
         self.chat_box.configure(state="disabled")
 
     def close_program(self):
-
+        try:
+            stop_speech()
+        except:
+            pass
         self.vision.stop_camera()
 
         self.root.destroy()
