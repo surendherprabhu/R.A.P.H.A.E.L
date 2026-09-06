@@ -134,6 +134,132 @@ def ListFiles(Folder_path = json_path):
     return sorted(chat_files)
 
 #------------------------------------------------------------------------------------------------------------------#
+MEMORY_FILE = "Dependencies/Memories/Memories.json"
+
+def load_memories(path=MEMORY_FILE):
+    """Load memories robustly. Handles legacy string format and new dict format.
+    Returns dict: {"content": str, "updated_at": str|None, "version": int}
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        return {"content": "", "updated_at": None, "version": 1}
+    except json.JSONDecodeError:
+        # File may be plain text (legacy)
+        try:
+            with open(path, "r", encoding="utf-8") as file:
+                raw = file.read().strip()
+            # Try to strip outer quotes if it was dumped as string with quotes
+            if raw.startswith('"') and raw.endswith('"'):
+                try:
+                    raw = json.loads(raw)
+                except:
+                    pass
+            return {"content": raw, "updated_at": None, "version": 1}
+        except:
+            return {"content": "", "updated_at": None, "version": 1}
+
+    # Legacy: file contains a JSON string directly
+    if isinstance(data, str):
+        return {"content": data.strip(), "updated_at": None, "version": 1}
+
+    if isinstance(data, dict):
+        # New format or quasi-new
+        if "content" in data:
+            return {
+                "content": str(data.get("content", "")).strip(),
+                "updated_at": data.get("updated_at"),
+                "version": int(data.get("version", 1)),
+            }
+        if "memories" in data:
+            return {
+                "content": str(data.get("memories", "")).strip(),
+                "updated_at": data.get("updated_at"),
+                "version": int(data.get("version", 1)),
+            }
+        if "text" in data:
+            return {
+                "content": str(data.get("text", "")).strip(),
+                "updated_at": data.get("updated_at"),
+                "version": int(data.get("version", 1)),
+            }
+        # Unknown dict shape — serialize it as content
+        return {"content": json.dumps(data, indent=2), "updated_at": None, "version": 1}
+
+    # Fallback: coerce to string
+    return {"content": str(data).strip(), "updated_at": None, "version": 1}
+
+def save_memories(content, path=MEMORY_FILE):
+    """Persist memories in versioned dict format. Cleans and deduplicates."""
+    cleaned = (content or "").strip()
+    # Remove common LLM preamble/postscript if present
+    # Keep bullet content, strip "Here are the updated memories:" wrappers
+    if cleaned.lower().startswith("here are"):
+        # Find first bullet/dash
+        for marker in ["\n- ", "\n• ", "\n* "]:
+            idx = cleaned.find(marker)
+            if idx != -1:
+                cleaned = cleaned[idx+1:].strip()
+                break
+    payload = {
+        "version": 1,
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "content": cleaned,
+    }
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(payload, file, indent=4)
+    return payload
+
+def get_memory_text(path=MEMORY_FILE):
+    """Convenience: return just the text content."""
+    return load_memories(path).get("content", "")
+
+def normalize_memory_content(text):
+    """Deduplicate bullet lines and trim whitespace."""
+    if not text:
+        return ""
+    lines = []
+    seen = set()
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        # Normalize bullet prefixes for dedup key
+        key = re.sub(r'^[-•*]\s*', '', line).lower().strip()
+        # Also strip markdown bold
+        key = re.sub(r'\*\*(.*?)\*\*', r'\1', key)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+def build_llm_context(conversation, max_messages=30, keep_system_count=2):
+    """Return a pruned copy for LLM calls: keep system prompts + last N messages."""
+    if not conversation:
+        return []
+    # Identify system prefix (consecutive system roles at start)
+    system_prefix = []
+    idx = 0
+    for msg in conversation:
+        if msg.get("role") == "system" and idx < keep_system_count:
+            system_prefix.append(msg)
+            idx += 1
+        else:
+            break
+    # If no system at start, at least keep first system
+    if not system_prefix and conversation and conversation[0].get("role") == "system":
+        system_prefix = [conversation[0]]
+
+    rest = conversation[len(system_prefix):]
+    # Keep only last max_messages of the rest
+    if len(rest) > max_messages:
+        rest = rest[-max_messages:]
+    return copy.deepcopy(system_prefix + rest)
+
+#------------------------------------------------------------------------------------------------------------------#
 def get_time():
     from datetime import datetime
 

@@ -68,19 +68,11 @@ class Raphael:
 
         self.settings = Settings()
 
+        # Robust memory load (handles legacy string & new dict format)
+        self._memory_data = load_memories()
+        self.memory = self._memory_data.get("content", "")
 
-        try:
-            with open("Dependencies/Memories/Memories.json", "r") as file:
-                self.memory = json.load(file)
-        except:
-            self.memory = ""
-
-        memories_message =  {
-                "role": "system",
-                "content": f"Your memories:{self.memory}"
-            }
-
-        self.conversation.append(memories_message)
+        self._inject_memory()
         self.vision = Vision()
         self.tools = {
     "get_time": get_time,
@@ -322,6 +314,50 @@ class Raphael:
     def update_model_label(self, selected_model):
         self.model_label.configure(text=f"Model: {selected_model}")
 
+    # ---------------- Memory & Context Helpers ----------------
+    def _load_memory_text(self):
+        data = load_memories()
+        self._memory_data = data
+        self.memory = data.get("content", "")
+        return self.memory
+
+    def _inject_memory(self):
+        """Ensure conversation has exactly one memory system message after the personality prompt."""
+        mem_text = self.memory or ""
+        content = f"Your memories:\n{mem_text}" if mem_text.strip() else "Your memories: (no prior memories yet)"
+        mem_msg = {"role": "system", "content": content}
+        # Conversation[0] is personality system prompt; memory should be at index 1
+        if len(self.conversation) >= 1 and self.conversation[0].get("role") == "system":
+            if len(self.conversation) >= 2 and "Your memories" in self.conversation[1].get("content", ""):
+                self.conversation[1] = mem_msg
+            else:
+                self.conversation.insert(1, mem_msg)
+        else:
+            self.conversation.insert(0, mem_msg)
+
+    def _refresh_memory_in_conversation(self):
+        self._load_memory_text()
+        self._inject_memory()
+
+    def _get_pruned_context(self, max_messages=30):
+        return build_llm_context(self.conversation, max_messages=max_messages, keep_system_count=2)
+
+    def _render_conversation_to_ui(self):
+        """Repopulate chat_box from conversation (user/assistant only)."""
+        self.chat_box.configure(state="normal")
+        self.chat_box.delete("1.0", "end")
+        for msg in self.conversation:
+            role = msg.get("role", "")
+            if role == "user":
+                self.chat_box.insert("end", f"You:\n{msg.get('content','')}\n\n")
+            elif role == "assistant":
+                # Skip empty tool-call placeholder messages
+                content = msg.get("content", "")
+                if content and content.strip():
+                    self.chat_box.insert("end", f"{application_name}:\n{content}\n\n")
+        self.chat_box.see("end")
+        self.chat_box.configure(state="disabled")
+
     def close_program(self):
 
         self.vision.stop_camera()
@@ -352,15 +388,24 @@ class Raphael:
         legacy_file = f"Dependencies/Data/{selected_chat}"
         chat_file = json_file if os.path.exists(json_file) else legacy_file
 
-        with open(chat_file) as file:
-            data = json.load(file)
-            self.save_chat()
-            self.chat_box.configure(state="normal")
-            self.chat_box.delete("1.0", "end")
-            self.chat_box.configure(state="disabled")
+        # Save current before switching (avoid saving empty)
+        try:
+            if len(self.conversation) > 2:
+                self.save_chat()
+        except Exception as e:
+            print(f"Auto-save before chat switch failed: {e}")
 
-            self.conversation = []
-            self.conversation = data   
+        try:
+            with open(chat_file, "r", encoding="utf-8") as file:
+                data = json.load(file)
+        except Exception as e:
+            print(f"Failed to load chat {selected_chat}: {e}")
+            return
+
+        self.conversation = data if isinstance(data, list) else copy.deepcopy(Conversation)
+        # Refresh memory to current version, not stale saved one
+        self._refresh_memory_in_conversation()
+        self._render_conversation_to_ui()   
   
     def add_message(self, content, role):
         self.chat_box.configure(state="normal")
@@ -710,29 +755,28 @@ class Raphael:
         MAX_TOOL_ITERATIONS = 10
 
         for _ in range(MAX_TOOL_ITERATIONS):
+            # Use pruned context for LLM to avoid unbounded growth, but persist full Convo
+            pruned = build_llm_context(Convo, max_messages=30, keep_system_count=2)
             response = ollama.chat(
             model=self.settings.model,
-            messages=Convo,
+            messages=pruned,
             tools=tools)
 
             assistant_message = response["message"]
+            # Persist the raw assistant message (with tool_calls) to full history
             Convo.append(assistant_message)
 
             tool_calls = assistant_message.get("tool_calls")
 
             if not tool_calls:
-                reply = clean_response(
-                    assistant_message["content"]
-                )
-
-                Convo.append({
-
-                    "role": "assistant",
-
-                    "content": reply
-
-                })
-
+                raw = assistant_message.get("content") or ""
+                reply = clean_response(raw)
+                # Replace the just-appended message's content with cleaned version to avoid duplicate
+                if reply != raw:
+                    Convo[-1] = {"role": "assistant", "content": reply}
+                # If raw was empty or already clean, keep as is but ensure content is cleaned
+                elif not Convo[-1].get("content"):
+                    Convo[-1]["content"] = reply
                 return reply
 
             for tool_call in tool_calls:
@@ -813,8 +857,15 @@ class Raphael:
         ).start()
     
     def new_chat(self):
+        # Save current first if non-trivial
+        try:
+            if len(self.conversation) > 2:
+                self.save_chat()
+        except Exception as e:
+            print(f"Auto-save before new chat failed: {e}")
         self.conversation = copy.deepcopy(Conversation)
-
+        self._load_memory_text()
+        self._inject_memory()
         self.chat_box.configure(state="normal")
         self.chat_box.delete("1.0", "end")
         self.chat_box.configure(state="disabled")
@@ -833,10 +884,13 @@ class Raphael:
             except (FileNotFoundError, json.JSONDecodeError):
                 continue
 
-        convo_copy = copy.deepcopy(self.conversation)
+        # Use pruned context for title generation to avoid tool bloat
+        convo_copy = build_llm_context(self.conversation, max_messages=12, keep_system_count=1)
+        # Strip tool messages for cleaner title
+        convo_copy = [m for m in convo_copy if m.get("role") in ("system", "user", "assistant")]
         convo_copy.append({
             "role" : "user",
-            "content": "summarize this convo in 3 words and dont say anything else"
+            "content": "Summarize this conversation in 3 words for a filename. Return only the 3 words, no punctuation."
         })
 
         try:
@@ -877,33 +931,58 @@ class Raphael:
         return "break"
  
     def add_memories(self):
-        try:
-            with open("Dependencies/Memories/Memories.json") as file:
-                data = json.load(file)
-        except (FileNotFoundError , json.JSONDecodeError):
-            data = ""
+        # Load current memories safely (handles legacy string & dict)
+        mem_data = load_memories()
+        existing = mem_data.get("content", "")
 
-        temp = copy.deepcopy(self.conversation)
-        temp.append({
-            "role" : "system",
-            "content" : f"""Hello Raphael. These are your memories '{data}',add the points from this conversation that you would find useful in your memories.
-                            Update the memory list.
-                            Only include factual information.
-                            Do not infer anything.
-                            Do not guess.
-                            Do summarize the entire conversation and extract the information from those chat which needs to be remembered and dont forget to update your memory with the things the user clearly wants you to remember"
-                            Only store information likely to be useful in future chats.
-                            Also this is not like a prompt your not going to reply to just list the things.
-                        """
-        })
+        # Build a focused conversation slice for memory extraction (avoid system/tool bloat)
+        temp = build_llm_context(self.conversation, max_messages=20, keep_system_count=1)
+        # Keep only user/assistant turns for memory relevance
+        filtered = [m for m in temp if m.get("role") in ("user", "assistant") and m.get("content", "").strip()]
+        # Always include memory context as system
+        memory_system = {
+            "role": "system",
+            "content": (
+                "You are a memory curator for R.A.P.H.A.E.L.\n"
+                f"Current memories:\n{existing if existing.strip() else '(none)'}\n\n"
+                "Task: Review the recent conversation and update the memory list.\n"
+                "Rules:\n"
+                "- Keep only factual, long-term useful information (user preferences, goals, facts, important events)\n"
+                "- Do not infer or hallucinate. Do not duplicate existing memories.\n"
+                "- If the user explicitly asked to remember something, include it.\n"
+                "- Return ONLY a bullet list (one fact per line starting with '- ').\n"
+                "- Keep bullets concise, max 15.\n"
+                "- If nothing new to remember, return the existing memories unchanged.\n"
+                "- Merge with existing memories, remove outdated contradictions, deduplicate."
+            ),
+        }
+        prompt = filtered + [memory_system]
+
         reply = ollama.chat(
-            model = self.settings.model,
-            messages=temp
+            model=self.settings.model,
+            messages=prompt
         )
 
-        memory = reply["message"]["content"]
-        with open("Dependencies/Memories/Memories.json", "w") as file:
-            json.dump(memory , file , indent=4)
+        raw_memory = (reply["message"]["content"] or "").strip()
+        # Clean and normalize (deduplicate, strip wrappers)
+        cleaned = normalize_memory_content(raw_memory)
+        if not cleaned:
+            cleaned = existing.strip()
+
+        # If LLM echoed existing verbatim without bullets, preserve existing
+        if cleaned.lower().startswith("here are") and existing:
+            # Prefer existing if new is just preamble
+            cleaned = existing.strip()
+
+        payload = save_memories(cleaned)
+        # Immediately refresh runtime memory so next turns see it
+        self._memory_data = payload
+        self.memory = payload.get("content", "")
+        # Update the injected memory message in current conversation
+        try:
+            self._inject_memory()
+        except Exception as e:
+            print(f"Memory injection refresh failed: {e}")
 
     def save_thread(self):
         self.save_chat()
