@@ -118,27 +118,9 @@ class Raphael:
         self._inject_memory()
         self.vision = Vision()
         self.tools = {
-    "get_time": get_time,
-    "search_web": search_web,
-    "get_date": get_date,
-    "get_battery": get_battery,
-    "open_app": open_app,
-    "list_directory": list_directory,
-    "write_file": write_file,
-    "read_file": read_file,
-    "create_directory": create_directory,
-    "get_system_info": get_system_info,
-    "open_website": open_website,
-    "read_clipboard": read_clipboard,
-    "write_clipboard": write_clipboard,
-    "list_running_apps": list_running_apps,
-    "get_calendar_events": get_calendar_events,
-    "create_reminder": create_reminder,
-    "take_screenshot": take_screenshot,
-    "extract_text_from_image": extract_text_from_image,
-    "media_control": media_control,
-    "volume_control": volume_control,
-    "analyze_camera": self.analyze_camera,
+    "get_time": get_time,"search_web": search_web,"get_date": get_date,"get_battery": get_battery,"open_app": open_app,"list_directory": list_directory,"write_file": write_file,"read_file": read_file,"create_directory": create_directory,"get_system_info": get_system_info,"open_website": open_website,"read_clipboard": read_clipboard,"write_clipboard": write_clipboard,"list_running_apps": list_running_apps,"get_calendar_events": get_calendar_events,"create_reminder": create_reminder,"take_screenshot": take_screenshot,"extract_text_from_image": extract_text_from_image,"media_control": media_control,"volume_control": volume_control,"analyze_camera": self.analyze_camera,
+    # 100 new
+    "delete_file": delete_file,"move_file": move_file,"copy_file": copy_file,"file_stats": file_stats,"search_files": search_files,"zip_directory": zip_directory,"unzip_file": unzip_file,"trash_file": trash_file,"get_disk_usage": get_disk_usage,"empty_trash": empty_trash,"reveal_in_finder": reveal_in_finder,"lock_file": lock_file,"set_brightness": set_brightness,"get_brightness": get_brightness,"toggle_wifi": toggle_wifi,"toggle_bluetooth": toggle_bluetooth,"set_do_not_disturb": set_do_not_disturb,"sleep_system": sleep_system,"restart_system": restart_system,"shutdown_system": shutdown_system,"lock_screen": lock_screen,"get_uptime": get_uptime,"kill_process": kill_process,"set_wallpaper": set_wallpaper,"clear_clipboard": clear_clipboard,"type_text": type_text,"press_keys": press_keys,"get_mouse_position": get_mouse_position,"set_mouse_position": set_mouse_position,"close_app": close_app,"hide_app": hide_app,"minimize_window": minimize_window,"maximize_window": maximize_window,"resize_window": resize_window,"move_window": move_window,"get_frontmost_app": get_frontmost_app,"focus_app": focus_app,"create_note": create_note,"list_notes": list_notes,"get_contacts": get_contacts,"create_contact": create_contact,"send_email": send_email,"get_emails": get_emails,"create_calendar_event": create_calendar_event,"delete_calendar_event": delete_calendar_event,"get_reminders": get_reminders,"delete_reminder": delete_reminder,"set_timer": set_timer,"get_notifications": get_notifications,"fetch_url": fetch_url,"summarize_website": summarize_website,"download_file": download_file,"get_weather": get_weather,"get_news": get_news,"search_youtube": search_youtube,"get_stock_price": get_stock_price,"translate_text": translate_text,"record_screen": record_screen,"record_audio": record_audio,"play_sound": play_sound,"get_microphone_list": get_microphone_list,"get_camera_list": get_camera_list,"set_camera": set_camera,"image_resize": image_resize,"image_convert": image_convert,"remember": remember,"forget": forget,"list_memories": list_memories,"summarize_chat": summarize_chat,"export_chat": export_chat,"import_chat": import_chat,"run_shell": run_shell,"run_python": run_python,"git_status": git_status,"get_env_var": get_env_var,"set_env_var": set_env_var,"list_processes": list_processes,"get_network_info": get_network_info,"ping_host": ping_host,"generate_image": generate_image,"ocr_file": ocr_file,"control_lights": control_lights,"run_shortcut": run_shortcut,"send_notification": send_notification,"get_location": get_location,"bluetooth_scan": bluetooth_scan,"calculate": calculate,"set_alarm": set_alarm,"convert_units": convert_units,"dictionary_define": dictionary_define,"get_wifi_networks": get_wifi_networks,"get_battery_health": get_battery_health,"get_cpu_usage": get_cpu_usage,"get_memory_usage": get_memory_usage,"compress_video": compress_video,"speech_to_text": speech_to_text,"text_to_speech": text_to_speech,"qr_generate": qr_generate,"qr_decode": qr_decode,"encrypt_file": encrypt_file,
 }
 
         self.create_window()
@@ -830,6 +812,1374 @@ class Raphael:
                 }
             },
             "required": ["prompt"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "delete_file",
+        "description": "Delete a file at path",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "move_file",
+        "description": "Move/rename a file",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "src": {"type": "string"},
+                    "dest": {"type": "string"}
+                },
+                    "required": ["src"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "copy_file",
+        "description": "Copy a file or folder",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "src": {"type": "string"},
+                    "dest": {"type": "string"}
+                },
+                    "required": ["src"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "file_stats",
+        "description": "Get file stats (size, mtime)",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "search_files",
+        "description": "Search files by glob and optional content",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "pattern": {"type": "string"},
+                    "path": {"type": "string"},
+                    "content_search": {"type": "string"}
+                },
+                    "required": ["pattern"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "zip_directory",
+        "description": "Zip a directory",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "source": {"type": "string"},
+                    "output": {"type": "string"}
+                },
+                    "required": ["source"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "unzip_file",
+        "description": "Unzip a file",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "zip_path": {"type": "string"},
+                    "dest": {"type": "string"}
+                },
+                    "required": ["zip_path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "trash_file",
+        "description": "Move file to Trash",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_disk_usage",
+        "description": "Get disk usage",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "empty_trash",
+        "description": "Empty the Trash",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "reveal_in_finder",
+        "description": "Reveal file in Finder",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "lock_file",
+        "description": "Lock a file (chflags uchg)",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "set_brightness",
+        "description": "Set display brightness 0-100",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "level": {"type": "integer"}
+                },
+                    "required": ["level"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_brightness",
+        "description": "Get display brightness",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "toggle_wifi",
+        "description": "Toggle WiFi on/off/toggle",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "action": {"type": "string"}
+                },
+                    "required": ["action"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "toggle_bluetooth",
+        "description": "Toggle Bluetooth",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "action": {"type": "string"}
+                },
+                    "required": ["action"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "set_do_not_disturb",
+        "description": "Enable/disable Do Not Disturb",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "enable": {"type": "boolean"}
+                },
+                    "required": ["enable"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "sleep_system",
+        "description": "Put system to sleep",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "restart_system",
+        "description": "Restart the Mac",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "shutdown_system",
+        "description": "Shut down the Mac",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "lock_screen",
+        "description": "Lock the screen",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_uptime",
+        "description": "Get system uptime",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "kill_process",
+        "description": "Kill process by name or PID",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "name_or_pid": {"type": "string"}
+                },
+                    "required": ["name_or_pid"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "set_wallpaper",
+        "description": "Set desktop wallpaper",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "clear_clipboard",
+        "description": "Clear clipboard",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "type_text",
+        "description": "Type text via keystrokes",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "text": {"type": "string"}
+                },
+                    "required": ["text"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "press_keys",
+        "description": "Press key combo like command+c",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "keys": {"type": "string"}
+                },
+                    "required": ["keys"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_mouse_position",
+        "description": "Get mouse position",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "set_mouse_position",
+        "description": "Set mouse position",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "x": {"type": "integer"},
+                    "y": {"type": "integer"}
+                },
+                    "required": ["x", "y"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "close_app",
+        "description": "Quit an application",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "app_name": {"type": "string"}
+                },
+                    "required": ["app_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "hide_app",
+        "description": "Hide an application",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "app_name": {"type": "string"}
+                },
+                    "required": ["app_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "minimize_window",
+        "description": "Minimize window",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "app_name": {"type": "string"}
+                },
+                    "required": ["app_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "maximize_window",
+        "description": "Maximize window full-screen",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "app_name": {"type": "string"}
+                },
+                    "required": ["app_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "resize_window",
+        "description": "Resize window",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "app_name": {"type": "string"},
+                    "width": {"type": "integer"},
+                    "height": {"type": "integer"}
+                },
+                    "required": ["app_name", "width", "height"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "move_window",
+        "description": "Move window",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "app_name": {"type": "string"},
+                    "x": {"type": "integer"},
+                    "y": {"type": "integer"}
+                },
+                    "required": ["app_name", "x", "y"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_frontmost_app",
+        "description": "Get frontmost app name",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "focus_app",
+        "description": "Focus app",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "app_name": {"type": "string"}
+                },
+                    "required": ["app_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "create_note",
+        "description": "Create Notes app note",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "title": {"type": "string"},
+                    "body": {"type": "string"}
+                },
+                    "required": ["title"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "list_notes",
+        "description": "List Notes titles",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_contacts",
+        "description": "List Contacts names",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "create_contact",
+        "description": "Create a contact",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "name": {"type": "string"},
+                    "email": {"type": "string"}
+                },
+                    "required": ["name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "send_email",
+        "description": "Draft email in Mail",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "to": {"type": "string"},
+                    "subject": {"type": "string"},
+                    "body": {"type": "string"}
+                },
+                    "required": ["to", "subject"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_emails",
+        "description": "Get recent email subjects",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "limit": {"type": "integer"}
+                },
+                    "required": ["limit"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "create_calendar_event",
+        "description": "Create calendar event",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "title": {"type": "string"},
+                    "start_date": {"type": "string"},
+                    "duration_minutes": {"type": "integer"}
+                },
+                    "required": ["title", "start_date"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "delete_calendar_event",
+        "description": "Delete calendar event by title",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "title": {"type": "string"}
+                },
+                    "required": ["title"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_reminders",
+        "description": "List reminders",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "list_name": {"type": "string"}
+                },
+                    "required": ["list_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "delete_reminder",
+        "description": "Delete reminder",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "title": {"type": "string"}
+                },
+                    "required": ["title"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "set_timer",
+        "description": "Set timer seconds",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "seconds": {"type": "integer"},
+                    "label": {"type": "string"}
+                },
+                    "required": ["seconds"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_notifications",
+        "description": "Get notifications",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "fetch_url",
+        "description": "Fetch URL text",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "url": {"type": "string"}
+                },
+                    "required": ["url"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "summarize_website",
+        "description": "Summarize website via LLM",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "url": {"type": "string"}
+                },
+                    "required": ["url"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "download_file",
+        "description": "Download URL to file",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "url": {"type": "string"},
+                    "dest": {"type": "string"}
+                },
+                    "required": ["url"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_weather",
+        "description": "Get weather for location",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "location": {"type": "string"},
+                    "units": {"type": "string"}
+                },
+                    "required": ["location"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_news",
+        "description": "Get news",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "topic": {"type": "string"},
+                    "limit": {"type": "integer"}
+                },
+                    "required": ["topic"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "search_youtube",
+        "description": "Search YouTube via web",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "query": {"type": "string"},
+                    "max_results": {"type": "integer"}
+                },
+                    "required": ["query"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_stock_price",
+        "description": "Get stock price data",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "symbol": {"type": "string"}
+                },
+                    "required": ["symbol"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "translate_text",
+        "description": "Translate text",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "text": {"type": "string"},
+                    "target_lang": {"type": "string"}
+                },
+                    "required": ["text"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "record_screen",
+        "description": "Record screen video",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "duration": {"type": "integer"},
+                    "output": {"type": "string"}
+                },
+                    "required": ["duration"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "record_audio",
+        "description": "Record microphone audio",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "duration": {"type": "integer"},
+                    "output": {"type": "string"}
+                },
+                    "required": ["duration"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "play_sound",
+        "description": "Play sound file",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_microphone_list",
+        "description": "List microphones",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_camera_list",
+        "description": "List cameras",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "set_camera",
+        "description": "Set camera index",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "index": {"type": "integer"}
+                },
+                    "required": ["index"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "image_resize",
+        "description": "Resize image",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"},
+                    "width": {"type": "integer"},
+                    "height": {"type": "integer"},
+                    "output": {"type": "string"}
+                },
+                    "required": ["width", "height"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "image_convert",
+        "description": "Convert image format",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"},
+                    "fmt": {"type": "string"},
+                    "output": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "remember",
+        "description": "Remember a fact to long-term memory",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "fact": {"type": "string"}
+                },
+                    "required": ["fact"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "forget",
+        "description": "Forget memories containing keyword",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "keyword": {"type": "string"}
+                },
+                    "required": ["keyword"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "list_memories",
+        "description": "List all memories",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "summarize_chat",
+        "description": "Summarize saved chat",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "chat_name": {"type": "string"}
+                },
+                    "required": ["chat_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "export_chat",
+        "description": "Export chat to md/json",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "chat_name": {"type": "string"},
+                    "fmt": {"type": "string"}
+                },
+                    "required": ["chat_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "import_chat",
+        "description": "Import chat JSON",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "run_shell",
+        "description": "Run shell command (max 10s)",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "command": {"type": "string"}
+                },
+                    "required": ["command"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "run_python",
+        "description": "Run Python code",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "code": {"type": "string"}
+                },
+                    "required": ["code"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "git_status",
+        "description": "Git status porcelain",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_env_var",
+        "description": "Get env var",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "name": {"type": "string"}
+                },
+                    "required": ["name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "set_env_var",
+        "description": "Set env var",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "name": {"type": "string"},
+                    "value": {"type": "string"}
+                },
+                    "required": ["name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "list_processes",
+        "description": "List processes",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_network_info",
+        "description": "Get network ifconfig",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "ping_host",
+        "description": "Ping a host",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "host": {"type": "string"}
+                },
+                    "required": ["host"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "generate_image",
+        "description": "Generate image from prompt (stub)",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "prompt": {"type": "string"}
+                },
+                    "required": ["prompt"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "ocr_file",
+        "description": "OCR image file",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "control_lights",
+        "description": "Control HomeKit lights via Shortcuts",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "action": {"type": "string"}
+                },
+                    "required": ["action"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "run_shortcut",
+        "description": "Run Shortcuts.app shortcut",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "name": {"type": "string"},
+                    "input_text": {"type": "string"}
+                },
+                    "required": ["name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "send_notification",
+        "description": "Send macOS notification",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "title": {"type": "string"},
+                    "message": {"type": "string"}
+                },
+                    "required": ["title", "message"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_location",
+        "description": "Get approximate location",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "bluetooth_scan",
+        "description": "Scan Bluetooth via system_profiler",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "calculate",
+        "description": "Calculate math expression",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "expression": {"type": "string"}
+                },
+                    "required": ["expression"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "set_alarm",
+        "description": "Set alarm",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "time_str": {"type": "string"},
+                    "label": {"type": "string"}
+                },
+                    "required": ["time_str"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "convert_units",
+        "description": "Convert units c/f km/mi",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "value": {"type": "number"},
+                    "from_unit": {"type": "string"},
+                    "to_unit": {"type": "string"}
+                },
+                    "required": ["value"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "dictionary_define",
+        "description": "Define word via dictionary API",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "word": {"type": "string"}
+                },
+                    "required": ["word"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_wifi_networks",
+        "description": "List preferred WiFi networks",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_battery_health",
+        "description": "Get battery health via system_profiler",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_cpu_usage",
+        "description": "Get CPU usage via top",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "get_memory_usage",
+        "description": "Get memory via vm_stat",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "compress_video",
+        "description": "Compress video via ffmpeg",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "input_path": {"type": "string"},
+                    "output_path": {"type": "string"}
+                },
+                    "required": ["input_path", "output_path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "speech_to_text",
+        "description": "Transcribe audio file with Whisper",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "text_to_speech",
+        "description": "Speak text via TTS",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "text": {"type": "string"}
+                },
+                    "required": ["text"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "qr_generate",
+        "description": "Generate QR code",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "text": {"type": "string"},
+                    "output": {"type": "string"}
+                },
+                    "required": ["text"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "qr_decode",
+        "description": "Decode QR from image",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"}
+                },
+                    "required": ["path"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "encrypt_file",
+        "description": "XOR encrypt file with password",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                    "path": {"type": "string"},
+                    "password": {"type": "string"}
+                },
+                    "required": ["path"]
         }
     }
 }
