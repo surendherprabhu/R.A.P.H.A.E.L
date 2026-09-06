@@ -36,7 +36,7 @@ python3 -m pip install customtkinter opencv-python ollama requests sounddevice n
 4. Pull the configured model if needed:
 
 ```bash
-ollama pull gemma4:e4b
+ollama pull qwen3.5:9b
 ```
 
 5. Confirm `piper` can find the bundled model file.

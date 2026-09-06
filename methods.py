@@ -26,6 +26,7 @@ from PIL import Image
 from PIL import ImageTk
 
 from Data import *
+import Data
 
 
 #------------------------------------------------------------------------------------------------------------------#
@@ -376,7 +377,7 @@ def extract_text_from_image(path):
             return f"Image not found: {path}"
 
         response = ollama.chat(
-            model=model,
+            model=Data.model,
             messages=[
                 {
                     "role": "user",

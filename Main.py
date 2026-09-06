@@ -30,6 +30,7 @@ from PIL import ImageTk
 from methods import *
 from Data import *
 from Vision import Vision
+from settings import Settings
 
 
 #------------------------------------------------------------------------------------------------------------------#
@@ -64,6 +65,8 @@ class Raphael:
         self.stream = None
         self.camera_ready = False
         self.whisper_model = None
+
+        self.settings = Settings()
 
 
         try:
@@ -210,7 +213,7 @@ class Raphael:
         self.root.configure(bg = "#050d1e")
         
         #seperators
-        ttk.Separator(self.root, orient="vertical").place(x=0.2, rely=0.09, relheight=0.81, relwidth=0.001)
+        ttk.Separator(self.root, orient="vertical").place(relx=0.2, rely=0.09, relheight=0.81, relwidth=0.001)
         ttk.Separator(self.root, orient="horizontal").place(relx=0, rely=0.09, relheight=0.001, relwidth=1)
         ttk.Separator(self.root, orient="horizontal").place(relx=0, rely=0.9, relheight=0.001, relwidth=1)
 
@@ -222,10 +225,15 @@ class Raphael:
         self.connection_label.place(relx = 0.90,rely =0.04,anchor="center")
 
         #settings button
-        ctk.CTkButton(self.root, text="Settings").place(relx=0.1,rely=0.95,anchor="center",relwidth = 0.14,)
+        ctk.CTkButton(
+            self.root,
+            text="Settings",
+            command=lambda: self.settings.create_window(self.root, self.update_model_label)
+        ).place(relx=0.1,rely=0.95,anchor="center",relwidth = 0.14,)
 
         #Model name at bottom
-        ctk.CTkLabel(self.root, text=f"Model: {model}").place(relx=0.88,rely=0.95,anchor="center")
+        self.model_label = ctk.CTkLabel(self.root, text=f"Model: {model}")
+        self.model_label.place(relx=0.88,rely=0.95,anchor="center")
 
         #chat selection
         self.Chat_selection = ctk.CTkComboBox(self.root,values=ListFiles(),state="readonly",command=self.chat_select)
@@ -299,7 +307,7 @@ class Raphael:
             return "Unable to return an image from the camera."
 
         response: ollama.ChatResponse = ollama.chat(
-        model=model,
+        model=self.settings.model,
         messages=[
             {
                 "role": "user",
@@ -311,6 +319,9 @@ class Raphael:
 
         return response["message"]["content"]   
         
+    def update_model_label(self, selected_model):
+        self.model_label.configure(text=f"Model: {selected_model}")
+
     def close_program(self):
 
         self.vision.stop_camera()
@@ -700,7 +711,7 @@ class Raphael:
 
         for _ in range(MAX_TOOL_ITERATIONS):
             response = ollama.chat(
-            model=model,
+            model=self.settings.model,
             messages=Convo,
             tools=tools)
 
@@ -813,31 +824,51 @@ class Raphael:
             return
 
         os.makedirs("Dependencies/Data", exist_ok=True)
+
+        for existing in ListFiles():
+            try:
+                with open(f"Dependencies/Data/{existing}.json") as file:
+                    if json.load(file) == self.conversation:
+                        return
+            except (FileNotFoundError, json.JSONDecodeError):
+                continue
+
         convo_copy = copy.deepcopy(self.conversation)
         convo_copy.append({
             "role" : "user",
             "content": "summarize this convo in 3 words and dont say anything else"
         })
 
-        filename_total = ollama.chat(
-            model = model,
-            messages = convo_copy
+        try:
+            filename_total = ollama.chat(
+                model = self.settings.model,
+                messages = convo_copy
+            )
+            filename = filename_total["message"]["content"]
+            filename = re.sub(
+                r'[<>:"/\\\\|?*]',
+                "",
+                filename).strip()
+            filename = filename[:50]
+            if not filename:
+                filename = "Untitled Chat"
+        except Exception as e:
+            print(f"Summary failed, using default name: {e}")
+            filename = time.strftime("Chat %d-%m-%Y %H-%M")
+
+        file = f"Dependencies/Data/{filename}.json"
+        with open(file , "w") as f:
+            json.dump(self.conversation, f, indent=4)
+
+        try:
+            self.add_memories()
+        except Exception as e:
+            print(f"Memory update failed: {e}")
+
+        self.root.after(
+            0,
+            lambda: self.Chat_selection.configure(values=ListFiles())
         )
-        filename = filename_total["message"]["content"]
-        filename = re.sub(
-            r'[<>:"/\\\\|?*]',
-            "",
-            filename).strip()
-        filename = filename[:50]
-        if not filename:
-            filename = "Untitled Chat"
-        file = f"{filename}.json"
-        with open(f"Dependencies/Data/{file}" , "w") as f:
-            json.dump(self.conversation, f)
-        self.add_memories()
-        self.Chat_selection.configure(
-                values=ListFiles()
-)
 
     def send_message_event(self, event):
         if event.state & 0x1:  # Shift key
@@ -866,7 +897,7 @@ class Raphael:
                         """
         })
         reply = ollama.chat(
-            model = model,
+            model = self.settings.model,
             messages=temp
         )
 

@@ -1,7 +1,7 @@
 
 #------------------------------------------------------------------------------------------------------------------#
 #Global Variables
-model = "gemma4:e4b"
+model = "qwen3.5:9b"
 
 json_path = "./Dependencies/Data"
 
@@ -207,29 +207,29 @@ voice_model = "Non_Github_Dependencies/Voices/en_GB-alan-medium.onnx"
 speech_location = "Dependencies/speech.wav"
 
 ALLOWED_APPS =  {
-    "Safari",
-    "Google Chrome",
+    "Affinity",
     "Calculator",
-    "Notes",
-    "Terminal",
-    "Finder",
-    "Spotify",
+    "Canva",
+    "ChatGPT",
+    "Chess",
+    "Cleaner-App",
+    "Codex",
     "Discord",
+    "Finder",
+    "Godot",
+    "Google Chrome",
+    "Minecraft",
+    "Notes",
+    "Roblox",
+    "Safari",
+    "Spotify",
+    "Steam",
+    "System Settings",
+    "Terminal",
     "Visual Studio Code",
     "Zen",
-    "Roblox",
-    "ChatGPT",
-    "Canva",
-    "Codex",
-    "Steam",
-    "Chess",
-    "Calculator",
-    "Cleaner-App",
-    "Godot",
-    "Affinity",
-    "Minecraft",
-    "Steam",
-    "System Settings"
 }
 
 connection_status = "Offline 💤"
+
+

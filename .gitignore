@@ -2,7 +2,11 @@
 .DS_Store
 __pycache__/
 *.py[cod]
+*.pyc
 build/
 dist/
 Dependencies/*.wav
 Dependencies/camera.jpg
+Dependencies/output.wav
+temp.py
+test.py
