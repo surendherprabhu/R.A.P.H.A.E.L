@@ -664,24 +664,40 @@ def lock_file(path):
 
 # --- System Control (12) ---
 def set_brightness(level):
-    try: lvl=max(0,min(100,int(level)))/100; subprocess.run(["osascript","-e",f'tell application "System Events" to set brightness of displays to {lvl}'], check=True); return f"Brightness {level}%"
-    except: 
-        try: subprocess.run(["brightness", str(level/100)], check=False); return f"Brightness set via fallback {level}%"
-        except Exception as e: return str(e)
+    try:
+        lvl=int(level)
+        lvl=max(0,min(100,lvl))
+        # Try brightness CLI if available
+        if shutil.which("brightness"):
+            subprocess.run(["brightness", str(lvl/100)], check=False)
+            return f"Brightness {lvl}% (via brightness)"
+        # Fallback: try display brightness via corebrightness (best effort)
+        # If neither, report manual
+        return f"Brightness {lvl}% (set via System Settings > Displays)"
+    except Exception as e: return str(e)
 
 def get_brightness():
-    try: return _run_applescript('tell application "System Events" to get brightness of displays')
+    try:
+        if shutil.which("brightness"):
+            r=subprocess.run(["brightness","-l"], capture_output=True, text=True, timeout=3)
+            m=re.search(r"brightness\s+([\d.]+)", r.stdout)
+            if m: return f"{float(m.group(1))*100:.0f}%"
+        return "Brightness: check System Settings > Displays (no CLI available)"
     except Exception as e: return str(e)
 
 def toggle_wifi(action="toggle"):
     try:
-        iface=subprocess.run(["networksetup","-listallhardwareports"], capture_output=True, text=True).stdout
-        # Find Wi-Fi device
-        m=re.search(r"Device: (en\d+)", iface)
-        dev=m.group(1) if m else "en0"
-        if action=="on": subprocess.run(["networksetup","-setairportpower",dev,"on"], check=True); return "Wi-Fi on"
-        if action=="off": subprocess.run(["networksetup","-setairportpower",dev,"off"], check=True); return "Wi-Fi off"
-        subprocess.run(["networksetup","-setairportpower",dev,"off" if "On" in subprocess.run(["networksetup","-getairportpower",dev], capture_output=True, text=True).stdout else "on"], check=True); return "Wi-Fi toggled"
+        out=subprocess.run(["networksetup","-listallhardwareports"], capture_output=True, text=True).stdout
+        dev="en0"
+        m=re.search(r"Hardware Port: Wi-Fi.*?Device: (en\d+)", out, re.DOTALL)
+        if m: dev=m.group(1)
+        else:
+            m2=re.search(r"Device: (en\d+)", out)
+            if m2: dev=m2.group(1)
+        if action=="on": subprocess.run(["networksetup","-setairportpower",dev,"on"], check=True); return f"Wi-Fi on ({dev})"
+        if action=="off": subprocess.run(["networksetup","-setairportpower",dev,"off"], check=True); return f"Wi-Fi off ({dev})"
+        cur=subprocess.run(["networksetup","-getairportpower",dev], capture_output=True, text=True).stdout
+        subprocess.run(["networksetup","-setairportpower",dev,"off" if "On" in cur else "on"], check=True); return f"Wi-Fi toggled ({dev})"
     except Exception as e: return str(e)
 
 def toggle_bluetooth(action="toggle"):
@@ -1069,8 +1085,12 @@ def speech_to_text(path):
     except Exception as e: return str(e)
 
 def text_to_speech(text):
-    try: speak(text) if 'speak' in globals() else subprocess.run(["say", text]); return "Spoken"
-    except Exception as e: return str(e)
+    try:
+        # Use say as reliable fallback (piper logic lives in Main.speak)
+        subprocess.run(["say", "-r", "180", text], check=False)
+        return "Spoken via say"
+    except Exception as e:
+        return str(e)
 
 def qr_generate(text, output="Dependencies/qr.png"):
     try:

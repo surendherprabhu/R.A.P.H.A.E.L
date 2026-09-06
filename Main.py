@@ -366,14 +366,10 @@ class Raphael:
         self.right_alt_held = False
         self.root.bind("<KeyPress-Alt_R>", self._on_right_alt_press)
         self.root.bind("<KeyRelease-Alt_R>", self._on_right_alt_release)
-        # macOS Option is Alt
-        self.root.bind("<KeyPress-Option_R>", self._on_right_alt_press)
-        self.root.bind("<KeyRelease-Option_R>", self._on_right_alt_release)
+        # Handle period while Right Alt held (flag-based; direct combo <Alt_R-period> is invalid in Tk)
         self.root.bind("<KeyPress-period>", self._handle_stop_voicing)
         self.root.bind("<KeyPress-greater>", self._handle_stop_voicing)  # period with shift is >
-        # Direct combos for robustness
-        self.root.bind("<Alt_R-period>", self.stop_voicing)
-        self.root.bind("<Option_R-period>", self.stop_voicing)
+
 
     def create_vision_overlay(self):
          #vision frame
