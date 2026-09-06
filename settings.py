@@ -82,6 +82,7 @@ class Settings:
         self.window.geometry(f"{self.screenwidth}x{self.screenheight}+{x_coordinate}+{y_coordinate}")
         self.window.title("Settings")
         self.window.configure(bg="#050d1e")
+        self.window.resizable(False, False)
         self.window.transient(parent)
         self.window.focus_force()
 

@@ -36,22 +36,65 @@ from settings import Settings
 #------------------------------------------------------------------------------------------------------------------#
 
 def speak(text):
-    process = subprocess.Popen(
-        [
-            "piper",
-            "--model",
-            voice_model,
-            "--output_file",
-            speech_location
-        ],
-        stdin=subprocess.PIPE,
-        text=True
-    )
-    process.communicate(text)
+    text = (text or "").strip()
+    if not text:
+        return
+    # Ensure output dir exists
+    try:
+        os.makedirs(os.path.dirname(speech_location) or ".", exist_ok=True)
+    except Exception:
+        pass
 
-    subprocess.run(
-        ["afplay", speech_location]
-    )
+    # Prefer piper if model exists, else fallback to macOS 'say'
+    use_piper = os.path.exists(voice_model) and os.path.exists(voice_model + ".json")
+    # Also check piper binary available
+    try:
+        import shutil
+        if shutil.which("piper") is None:
+            use_piper = False
+    except Exception:
+        pass
+
+    if use_piper:
+        try:
+            # Limit overly long text for piper (truncate extremely long replies)
+            # Piper handles up to few k chars fine; split if needed
+            proc = subprocess.Popen(
+                [
+                    "piper",
+                    "--model",
+                    voice_model,
+                    "--output_file",
+                    speech_location,
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            out, err = proc.communicate(text, timeout=30)
+            if proc.returncode != 0:
+                print(f"Piper failed ({proc.returncode}): {err.strip()[:300]}")
+                raise RuntimeError(err)
+            if not os.path.exists(speech_location) or os.path.getsize(speech_location) < 1000:
+                print("Piper produced no audio, falling back to say")
+                raise RuntimeError("empty wav")
+            # Play with boosted volume (afplay -v 2 is louder)
+            subprocess.run(["afplay", "-v", "2", speech_location], check=False)
+            return
+        except Exception as e:
+            print(f"TTS piper path failed: {e}")
+
+    # Fallback: macOS native speech synthesis (always available)
+    try:
+        # Use high-quality voice if available, otherwise default
+        subprocess.run(["say", "-r", "180", text], check=False)
+    except Exception as e:
+        print(f"Fallback say failed: {e}")
+        try:
+            subprocess.run(["afplay", speech_location], check=False)
+        except Exception:
+            pass
 
 #------------------------------------------------------------------------------------------------------------------#
 class Raphael:
@@ -122,13 +165,26 @@ class Raphael:
                 compute_type="int8"
             )
 
-        self.voice_segments, self.voice_info = self.whisper_model.transcribe("Dependencies/voice.wav")
+        try:
+            self.voice_segments, self.voice_info = self.whisper_model.transcribe(
+                "Dependencies/voice.wav",
+                beam_size=5,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500)
+            )
+        except Exception as e:
+            print(f"Whisper transcribe failed: {e}")
+            return
 
         self.voice_text = ""
         for segment in self.voice_segments:
             self.voice_text += segment.text
 
-        self.voice_text_result = self.voice_text
+        self.voice_text_result = self.voice_text.strip()
+        if not self.voice_text_result:
+            print("No speech recognized")
+            return
+        print(f"Transcribed: {self.voice_text_result}")
         self.input_box.delete("1.0","end" )
 
         self.input_box.insert("1.0",self.voice_text_result)
@@ -144,12 +200,15 @@ class Raphael:
         self.audio_frames = []
 
         def callback(indata, frames, time, status):
+            if status:
+                print(f"Audio status: {status}")
             if self.recording:
                 self.audio_frames.append(indata.copy())
             
         self.stream = sd.InputStream(
             samplerate=16000,
             channels=1,
+            dtype="float32",
             callback=callback
         )
 
@@ -163,17 +222,41 @@ class Raphael:
 
         self.recording = False
 
-        self.stream.stop()
-        self.stream.close()
+        try:
+            self.stream.stop()
+            self.stream.close()
+        except Exception as e:
+            print(f"Stream stop error: {e}")
+            self.stream = None
 
         if len(self.audio_frames) == 0:
             print("No Audio Recorded")
             return
 
-        audio = np.concatenate(self.audio_frames, axis = 0)
-
-        write("Dependencies/voice.wav" , 16000 , audio)
-        print("Saved Voice")
+        try:
+            audio = np.concatenate(self.audio_frames, axis=0)
+            # Ensure dir exists
+            os.makedirs(os.path.dirname("Dependencies/voice.wav") or ".", exist_ok=True)
+            # sounddevice gives float32 in [-1,1]. Normalize, apply gain, convert to int16 for robust Whisper
+            # Flatten to mono if needed
+            if audio.ndim > 1:
+                audio = audio.mean(axis=1)
+            audio = audio.astype(np.float32)
+            # Remove DC offset
+            audio = audio - np.mean(audio)
+            # Auto-gain: normalize to 0.9 peak
+            peak = np.max(np.abs(audio))
+            if peak > 0:
+                audio = audio * (0.9 / peak)
+                # Slight boost for quiet mics
+                audio = np.clip(audio * 1.2, -1.0, 1.0)
+            # Convert to int16
+            audio_int16 = (audio * 32767).astype(np.int16)
+            write("Dependencies/voice.wav", 16000, audio_int16)
+            print(f"Saved Voice ({len(audio_int16)} samples, peak {peak:.3f})")
+        except Exception as e:
+            print(f"Voice save failed: {e}")
+            return
         self.process_voice()
 
     def create_window(self):
@@ -203,6 +286,7 @@ class Raphael:
         self.root.geometry(f"{self.screenwidth}x{self.screenheight}+{x_coordinate}+{y_coordinate}")
         self.root.title(application_name)
         self.root.configure(bg = "#050d1e")
+        self.root.resizable(False, False)
         
         #seperators
         ttk.Separator(self.root, orient="vertical").place(relx=0.2, rely=0.09, relheight=0.81, relwidth=0.001)
