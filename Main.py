@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from tkinter.scrolledtext import ScrolledText
 import customtkinter as ctk
 
@@ -495,6 +495,35 @@ class Raphael:
         self.chat_box.configure(state="disabled")
 
     def close_program(self):
+        # Prompt to save to memory on quit if there's a meaningful conversation
+        has_user_msg = any(m.get("role") == "user" for m in self.conversation)
+        if has_user_msg and len(self.conversation) > 2:
+            try:
+                resp = messagebox.askyesnocancel(
+                    "Save to Memory?",
+                    "Save this conversation to long-term memory before quitting?\n\nYes = Save to memory and chat history\nNo = Quit without saving\nCancel = Stay in app",
+                    parent=self.root
+                )
+            except Exception as e:
+                print(f"Quit prompt failed: {e}")
+                resp = False
+            if resp is None:  # Cancel
+                return
+            if resp:  # Yes - save
+                try:
+                    self.root.configure(cursor="wait")
+                    self.root.update()
+                    # Use same save path as Save chat (includes memory update)
+                    self.save_chat()
+                    # Small delay to let file writes flush (save_chat is sync for ollama+memory)
+                    time.sleep(0.3)
+                except Exception as e:
+                    print(f"Save on exit failed: {e}")
+                finally:
+                    try:
+                        self.root.configure(cursor="")
+                    except:
+                        pass
         try:
             stop_speech()
         except:
